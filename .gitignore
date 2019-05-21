@@ -1,0 +1,14 @@
+/target/
+/.vscode
+/*.iml
+/.idea
+/.apt_generated/
+/.settings/
+/.factorypath
+/.project
+.externalToolBuilders/
+/.classpath
+/bin/
+/*.properties
+/*.properties.lock
+/.sts4-cache

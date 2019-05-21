@@ -1,0 +1,71 @@
+package com.github.scm1219.video.domain;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class DiskManager {
+	
+	private static DiskManager instance = new DiskManager();
+	
+	public static DiskManager getInstance() {
+		return instance;
+	}
+	private DiskManager() {
+		try {
+			Class.forName("org.sqlite.JDBC");
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		}
+		log.info("sqlite jdbc 驱动加载完成");
+	}
+	List<Disk> disks = new ArrayList<>();
+	
+	public void loadDisks() {
+		File[] f = File.listRoots();
+		for (int i = 0; i < f.length; i++) {
+			Disk disk = new Disk(f[i]);
+			if(disk.needIndex() && !disks.contains(disk) ) {
+				disks.add(disk);
+			}else {
+				log.info("因未发现"+Disk.FLAF_FILE+"文件，忽略磁盘"+disk.getPath());
+			}
+		}
+	}
+	
+	public Disk findDisk(File file) {
+		for (Disk disk : disks) {
+			if(disk.getRoot().equals(file)) {
+				return disk;
+			}
+		}
+		return null;
+	}
+	
+	public List<File> searchAllFiles(String fileName) {
+		List<File> allFiles = new ArrayList<>();
+		for (Disk disk : disks) {
+			List<File> findFiles = disk.getIndex().findFiles(fileName);
+			allFiles.addAll(findFiles);
+		}
+		return allFiles;
+	}
+	
+	public List<File> searchAllDirs(String dirName) {
+		List<File> allFiles = new ArrayList<>();
+		for (Disk disk : disks) {
+			List<File> findFiles = disk.getIndex().findDirs(dirName);
+			allFiles.addAll(findFiles);
+		}
+		return allFiles;
+	}
+	
+	public List<Disk> listDisk(){
+		return Collections.unmodifiableList(disks);
+	}
+
+}
