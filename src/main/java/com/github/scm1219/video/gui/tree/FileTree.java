@@ -65,33 +65,22 @@ public class FileTree extends JTree {
 
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
-				File file = fileTreeNode.getFile();
-				Disk disk = DiskManager.getInstance().findDisk(file);
-//				boolean startIndex = false;
-//				if(disk.getIndex().exists()) {
-//					int result = JOptionPane.showConfirmDialog(null, "是否更新索引？");
-//					if (JOptionPane.YES_OPTION == result) {
-//						startIndex = true;
-//					}
-//				}else {
-//					startIndex = true;
-//				}
-//				if(startIndex) {
-					new Thread(new Runnable() {
-						@Override
-						public void run() {
-//							long t1 = System.currentTimeMillis();
-//							disk.createIndex();
-//							long t2 = System.currentTimeMillis();
-//							String data = disk.getIndex().getInfoString();
-//							JOptionPane.showMessageDialog(null, "索引创建成功\n"+"耗时："+(t2-t1)+"毫秒\n"+data);
-							FileUpdateProcesser pro = new FileUpdateProcesser(disk);
-							pro.setVisible(true);
-						}
-					}).start();
-//				}
-				
+				if(mouseInPath!=null) {
+					FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
+					File file = fileTreeNode.getFile();
+					Disk disk = DiskManager.getInstance().findDisk(file);
+					if(!disk.getIndex().isIndexing()) {
+						new Thread(new Runnable() {
+							@Override
+							public void run() {
+								FileUpdateProcesser pro = new FileUpdateProcesser(disk);
+								pro.setVisible(true);
+							}
+						}).start();
+					}else {
+						JOptionPane.showMessageDialog(null, "索引正在创建中，不能重复创建");
+					}
+				}
 			}
 		});
 

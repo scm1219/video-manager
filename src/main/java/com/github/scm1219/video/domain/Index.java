@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import javax.swing.JOptionPane;
 import javax.swing.JProgressBar;
 
 import com.github.houbb.opencc4j.util.ZhConverterUtil;
@@ -33,6 +34,8 @@ public class Index {
 	private File indexFile;
 	
 	private boolean exists =false;
+	
+	boolean isIndexing=false;
 	
 	public Index(File indexFile) {
 		this.indexFile = indexFile;
@@ -101,9 +104,21 @@ public class Index {
 			e.printStackTrace();
 		}
 	}
-	
+	public synchronized boolean isIndexing() {
+		return isIndexing;
+	}
 	public void create(Disk disk) {
-		create(disk, null);
+		if(isIndexing) {
+			throw new RuntimeException("索引正在创建中，请稍后");
+		}else {
+			isIndexing=true;
+			try {
+				create(disk, null);
+			} catch (Exception e) {
+				JOptionPane.showMessageDialog(null, "创建索引出错："+e.getLocalizedMessage());
+			}
+			isIndexing=false;
+		}
 	}
 	
 	private static String getString(String data) {

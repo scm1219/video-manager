@@ -22,8 +22,9 @@ public class Disk {
 		disk = f;
 		File indexFile = new File(disk.getPath()+INDEX_FILE);
 		index = new Index(indexFile);
-		
 	}
+	
+	
 	
 	public File getRoot() {
 		return disk;
@@ -34,12 +35,15 @@ public class Disk {
 	}
 	
 	public void createIndex() {
-		index.create(this);
+		
+			index.create(this);
+		
 	}
 	
 	public Index getIndex() {
 		return index;
 	}
+	
 	
 	public boolean needIndex() {
 		File flagFile = new File(disk.getPath()+FLAF_FILE);
