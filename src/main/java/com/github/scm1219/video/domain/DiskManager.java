@@ -70,7 +70,7 @@ public class DiskManager {
 	}
 	
 	public List<File> searchAllFiles(String fileName) {
-		List<File> allFiles = new ArrayList<>();
+		List<File> allFiles = Collections.synchronizedList(new ArrayList<>());
 		disks.parallelStream().forEach(disk -> {List<File> findFiles = disk.getIndex().findFiles(fileName);allFiles.addAll(findFiles);});
 		return allFiles;
 	}
