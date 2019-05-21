@@ -71,13 +71,13 @@ public class DiskManager {
 	
 	public List<File> searchAllFiles(String fileName) {
 		List<File> allFiles = new ArrayList<>();
-		disks.stream().forEach(disk -> {List<File> findFiles = disk.getIndex().findFiles(fileName);allFiles.addAll(findFiles);});
+		disks.parallelStream().forEach(disk -> {List<File> findFiles = disk.getIndex().findFiles(fileName);allFiles.addAll(findFiles);});
 		return allFiles;
 	}
 	
 	public List<File> searchAllDirs(String dirName) {
 		List<File> allFiles = Collections.synchronizedList(new ArrayList<>());
-		disks.stream().forEach(disk -> {List<File> findFiles = disk.getIndex().findDirs(dirName);allFiles.addAll(findFiles);});
+		disks.parallelStream().forEach(disk -> {List<File> findFiles = disk.getIndex().findDirs(dirName);allFiles.addAll(findFiles);});
 		return allFiles;
 	}
 	
