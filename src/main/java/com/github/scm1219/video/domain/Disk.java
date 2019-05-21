@@ -35,9 +35,7 @@ public class Disk {
 	}
 	
 	public void createIndex() {
-		
-			index.create(this);
-		
+		index.create(this);
 	}
 	
 	public Index getIndex() {

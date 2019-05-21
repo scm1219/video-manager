@@ -70,6 +70,7 @@ public class FileExplorerWindow extends JFrame {
     private void initData(){
         stackFile = new Stack<File>();
         List<Disk> listDisk = DiskManager.getInstance().listDisk();
+        
         File[] rootDisks = new File[listDisk.size()];
         for (int i = 0; i < rootDisks.length; i++) {
 			rootDisks[i]=listDisk.get(i).getRoot();

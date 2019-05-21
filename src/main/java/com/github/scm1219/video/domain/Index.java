@@ -40,6 +40,21 @@ public class Index {
 	public Index(File indexFile) {
 		this.indexFile = indexFile;
 		exists = indexFile.exists() && indexFile.length()>0;
+		
+		//数据库链接预初始化
+		if(exists) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try(Connection conn =getConnection()){
+						log.debug("sqlite数据库链接正常");
+					}catch (Exception e) {
+						e.printStackTrace();
+					}
+					
+				}
+			}).start();
+		}
 	}
 	
 	private Connection getConnection() throws Exception {
