@@ -7,6 +7,7 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
+import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -23,6 +24,7 @@ import java.util.Vector;
 import javax.swing.JButton;
 import javax.swing.JFrame;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
@@ -40,6 +42,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
+import com.github.scm1219.video.domain.Index;
 import com.github.scm1219.video.gui.table.FileTable;
 import com.github.scm1219.video.gui.table.FileTableModel;
 import com.github.scm1219.video.gui.tree.FileTree;
@@ -72,18 +75,21 @@ public class FileExplorerWindow extends JFrame {
         List<Disk> listDisk = DiskManager.getInstance().listDisk();
         
         File[] rootDisks = new File[listDisk.size()];
-        for (int i = 0; i < rootDisks.length; i++) {
-			rootDisks[i]=listDisk.get(i).getRoot();
-		}
-        fileTreeRoot = new FileTreeNode(rootDisks[0], true);
         
-        File[] files = rootDisks;
-        for (int i = 0; i < files.length; i++) {
-            if (files[i].isDirectory())
-            {
-                FileTreeNode childNode = new FileTreeNode(files[i], false);
-                fileTreeRoot.add(childNode);
-            }
+        if(rootDisks.length>0) {
+        	for (int i = 0; i < rootDisks.length; i++) {
+    			rootDisks[i]=listDisk.get(i).getRoot();
+    		}
+	        fileTreeRoot = new FileTreeNode(rootDisks[0], true);
+	        
+	        File[] files = rootDisks;
+	        for (int i = 0; i < files.length; i++) {
+	            if (files[i].isDirectory())
+	            {
+	                FileTreeNode childNode = new FileTreeNode(files[i], false);
+	                fileTreeRoot.add(childNode);
+	            }
+	        }
         }
     }
 
@@ -265,7 +271,9 @@ public class FileExplorerWindow extends JFrame {
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				tfSearch.setText("");
-				updateTable(currentDir,false);
+				if(currentDir!=null) {
+					updateTable(currentDir,false);
+				}
 			}
 		});
         btnSearch.addActionListener(new ActionListener() {
@@ -374,6 +382,9 @@ public class FileExplorerWindow extends JFrame {
                 super.windowClosed(e);
             }
         });
+        if(DiskManager.getInstance().listDisk().size()<1) {
+        	JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "警告", MessageType.INFO.ordinal());
+        }
     }
     
 }
