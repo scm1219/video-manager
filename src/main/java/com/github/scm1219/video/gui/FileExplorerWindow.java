@@ -42,7 +42,6 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
-import com.github.scm1219.video.domain.Index;
 import com.github.scm1219.video.gui.table.FileTable;
 import com.github.scm1219.video.gui.table.FileTableModel;
 import com.github.scm1219.video.gui.tree.FileTree;

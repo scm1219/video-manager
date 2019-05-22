@@ -82,7 +82,7 @@ public class Index {
 					stmt.execute("delete from files");
 				}
 			}
-			List<File> dirs = disk.listVideoDir();
+			List<File> dirs = disk.listVideoDir(bar);
 			Collections.sort(dirs);
 			int totalCount = dirs.size();
 			int processedCount =0;
@@ -133,6 +133,12 @@ public class Index {
 				JOptionPane.showMessageDialog(null, "创建索引出错："+e.getLocalizedMessage());
 			}
 			isIndexing=false;
+		}
+	}
+	
+	public void cancel(Disk disk) {
+		if(isIndexing) {
+			
 		}
 	}
 	

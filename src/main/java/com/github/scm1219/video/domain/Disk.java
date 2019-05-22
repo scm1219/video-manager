@@ -4,6 +4,8 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.JProgressBar;
+
 import com.github.scm1219.utils.FileUtils;
 
 import lombok.ToString;
@@ -50,20 +52,20 @@ public class Disk {
 	
 	
 	public List<File> listVideoDir() {
-		File base = disk;
-		List<File> result = new ArrayList<>();
-		findVideoDir(base, result);
-		return result;
+		return listVideoDir(null);
 	}
 	
-	private boolean findVideoDir(File parent,List<File> result) {
+	private boolean findVideoDir(File parent,List<File> result,JProgressBar bar) {
 		File[] subDirs = parent.listFiles();
 		boolean currentVideo= hasVideoFiles(parent);
+		if(bar!=null) {
+			bar.setString("检查"+parent.getPath()+"是否需要扫描");
+		}
 		if(subDirs!=null) {
 			for (File  subDir: subDirs) {
 				if(subDir.isDirectory()) {
 					//先遍历子目录是否包含视频
-					boolean subHasVideo = findVideoDir(subDir, result);
+					boolean subHasVideo = findVideoDir(subDir, result,bar);
 					if (subHasVideo) {
 						currentVideo = true;
 					}
@@ -91,5 +93,14 @@ public class Disk {
 			}
 		}
 		return false;
+	}
+
+
+
+	public List<File> listVideoDir(JProgressBar bar) {
+		File base = disk;
+		List<File> result = new ArrayList<>();
+		findVideoDir(base, result,bar);
+		return result;
 	}
 }
