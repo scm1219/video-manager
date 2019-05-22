@@ -139,54 +139,30 @@ public class FileExplorerWindow extends JFrame {
         }
     };
     
+    /**
+     * 更新搜索结果
+     * @param files
+     */
     private void updateSearchResult(List<File> files) {
-    	
-    	Vector<File> vFile = new Vector<File>(files);
-        Collections.sort(vFile, FILE_COMPARATOR);
-    	Object[][] fileData;
-        fileData = new Object[files.size()][4];
-        for (int i = 0; i < fileData.length; i++){
-            for (int j = 0; j < 4; j++){
-                fileData[i][j] = vFile.elementAt(i);
-            }
-        }
-
-        FileTableModel model = new FileTableModel(fileData);
-        tbFile.setModel(model);
-        TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
-        sort.setComparator(0, FILE_COMPARATOR);
-        tbFile.setRowSorter(sort);
-        // 设置table 列宽
-        tbFile.getColumnModel().getColumn(0).setPreferredWidth(200);
-        tbFile.getColumnModel().getColumn(1).setPreferredWidth(120);
-        tbFile.getColumnModel().getColumn(2).setPreferredWidth(100);
-        tbFile.getColumnModel().getColumn(3).setPreferredWidth(50);
-        tbFile.getColumnModel().getColumn(3).setPreferredWidth(50);
-        spTable.getViewport().setBackground(Color.white);
+    	File[] fileArray = new File[files.size()];
+    	files.toArray(fileArray);
+    	setFileTable(fileArray);
     }
-
-    private File currentDir = null;
-    private void updateTable(File file, Boolean isBack){
-        String path = file.getAbsolutePath();
-        if (path == null)
-            return;
-        tfDir.setText(path);
-        currentDir = file;
-        File[] files = fileSystemView.getFiles(file, false);
-
-        if (!isBack){
-            stackFile.push(file);
-        }
-        Vector<File> vFile = new Vector<File>();
+    
+    /**
+     * 设置表格里的数据
+     * @param files
+     */
+    private void setFileTable(File[] files) {
+    	Vector<File> vFile = new Vector<File>();
         for (int i = 0; i < files.length; i++){
             vFile.add(files[i]);
         }
         Collections.sort(vFile, FILE_COMPARATOR);
-
         Object[][] fileData;
-        fileData = new Object[files.length][4];
+        fileData = new Object[files.length][5];
         for (int i = 0; i < fileData.length; i++){
-            for (int j = 0; j < 4; j++){
+            for (int j = 0; j < 5; j++){
                 fileData[i][j] = vFile.elementAt(i);
             }
         }
@@ -203,7 +179,20 @@ public class FileExplorerWindow extends JFrame {
         tbFile.getColumnModel().getColumn(3).setPreferredWidth(50);
         tbFile.getColumnModel().getColumn(4).setPreferredWidth(150);
         spTable.getViewport().setBackground(Color.white);
+    }
 
+    private File currentDir = null;
+    private void updateTable(File file, Boolean isBack){
+        String path = file.getAbsolutePath();
+        if (path == null)
+            return;
+        tfDir.setText(path);
+        currentDir = file;
+        if (!isBack){
+            stackFile.push(file);
+        }
+        File[] files = fileSystemView.getFiles(file, false);
+        setFileTable(files);
     }
 
     private void AddComponentListener(){

@@ -56,7 +56,7 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
             }
             this.setIcon(null);
         } else if (column == 4) {
-        	File file = (File)table.getValueAt(row,0);
+        	File file = (File) value;
             this.setText(file.getAbsolutePath());
             this.setIcon(null);
         }
