@@ -7,7 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FileUtils {
 
-	private static String[] videoExtends = { ".mp4", ".mkv", ".rm", ".rmvb", "wmv", ".flv" };
+	private static String[] videoExtends = { ".mp4", ".mkv", ".rm", ".rmvb", "wmv", ".flv",".ogm" };
 
 	public static boolean isVideoFile(File f) {
 		String fileName = f.getName().toLowerCase();
