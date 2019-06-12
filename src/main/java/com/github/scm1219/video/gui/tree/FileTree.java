@@ -17,6 +17,7 @@ import javax.swing.filechooser.FileSystemView;
 import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreePath;
 
+import com.github.scm1219.utils.DiskUtils;
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
 
@@ -29,11 +30,13 @@ public class FileTree extends JTree {
 	private void initPopMenu() {
 		FileTree parent = this;
 
-		JMenuItem mEchoIndexInfo, mCreateIndex;
+		JMenuItem mEchoIndexInfo, mCreateIndex,mShowSmart;
 		mEchoIndexInfo = new JMenuItem("查看索引信息");
 		menu.add(mEchoIndexInfo);
 		mCreateIndex = new JMenuItem("更新索引");
 		menu.add(mCreateIndex);
+		mShowSmart = new JMenuItem("磁盘健康状况");
+		menu.add(mShowSmart);
 		this.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
 				if (e.getButton() == MouseEvent.BUTTON3) {
@@ -45,7 +48,6 @@ public class FileTree extends JTree {
 		});
 		mEchoIndexInfo.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				// TODO: 检查mouseInPath为啥会null
 				if(mouseInPath != null) {
 					FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
 					File file = fileTreeNode.getFile();
@@ -61,8 +63,29 @@ public class FileTree extends JTree {
 			}
 		});
 		
+		mShowSmart.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent e) {
+				if(mouseInPath != null) {
+					FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
+					File file = fileTreeNode.getFile();
+					Disk disk = DiskManager.getInstance().findDisk(file);
+					if(disk==null) {
+						JOptionPane.showMessageDialog(null, "无法找到磁盘");
+					}else {
+						new Thread(new Runnable() {
+							@Override
+							public void run() {
+								String data = DiskUtils.getSmartInfo(disk);
+								JOptionPane.showMessageDialog(null, "S.M.A.R.T\n"+data);
+							}
+						}).start();
+						
+					}
+				}
+			}
+		});
+		
 		mCreateIndex.addActionListener(new ActionListener() {
-
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				if(mouseInPath!=null) {

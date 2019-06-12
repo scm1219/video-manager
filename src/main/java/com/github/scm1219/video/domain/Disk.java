@@ -27,6 +27,9 @@ public class Disk {
 	}
 	
 	
+	public String getVolumeName() {
+		return getPath().substring(0,2);
+	}
 	
 	public File getRoot() {
 		return disk;
