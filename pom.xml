@@ -153,8 +153,10 @@
                             <icon>src/main/resources/0.ico</icon>  
                             <jre>  
                                 <minVersion>1.8</minVersion>  
-                                <jdkPreference>preferJre</jdkPreference>  
-                            </jre>  
+                                <jdkPreference>preferJre</jdkPreference>
+                                <maxHeapSize>256</maxHeapSize>
+                                <initialHeapSize>64</initialHeapSize>  
+                            </jre>
                             <versionInfo>  
                                 <fileVersion>1.0.0.0</fileVersion>  
                                 <txtFileVersion>${project.version}</txtFileVersion>  
@@ -166,6 +168,7 @@
                                 <companyName>springtour.com</companyName>  
                                 <internalName>video-manager</internalName>
                                 <originalFilename>video-manager.exe</originalFilename>  
+                                
                             </versionInfo>  
                         </configuration>  
                     </execution>  
