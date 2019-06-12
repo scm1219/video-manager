@@ -1,6 +1,7 @@
 package com.github.scm1219.video.gui.tree;
 
 import java.awt.Rectangle;
+import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -75,8 +76,8 @@ public class FileTree extends JTree {
 						new Thread(new Runnable() {
 							@Override
 							public void run() {
-								String data = DiskUtils.getSmartInfo(disk);
-								JOptionPane.showMessageDialog(null, "S.M.A.R.T\n"+data);
+								Object data = DiskUtils.getSmartInfo(disk);
+								JOptionPane.showMessageDialog(null, data,"S.M.A.R.T检测",MessageType.INFO.ordinal());
 							}
 						}).start();
 						

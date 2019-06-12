@@ -12,4 +12,4 @@
 
 可选功能，检测smart信息
 从 https://www.smartmontools.org 下载 smartmontools，将smartctl复制到windows的system32目录下
-对于非移动硬盘，SMART检测会失败
+对于非移动硬盘，默认SMART检测会失败，可以给video-manager赋予管理员权限运行
