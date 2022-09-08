@@ -145,7 +145,7 @@ public class Index {
 	private static String getString(String data) {
 		if(org.apache.commons.lang3.StringUtils.isNotEmpty(data)) {
 			String result  = data.toLowerCase();
-			result = ZhConverterUtil.convertToSimple(result);
+			result = ZhConverterUtil.toSimple(result);
 			return result;
 		}else {
 			return data;

@@ -19,43 +19,43 @@
 		<dependency>
 			<groupId>org.xerial</groupId>
 			<artifactId>sqlite-jdbc</artifactId>
-			<version>3.27.2.1</version>
+			<version>3.39.2.1</version>
 		</dependency>
 		<dependency>
 			<groupId>com.github.houbb</groupId>
 			<artifactId>opencc4j</artifactId>
-			<version>1.1.0</version>
+			<version>1.7.2</version>
 		</dependency>
 		<dependency>
 			<groupId>org.slf4j</groupId>
 			<artifactId>slf4j-api</artifactId>
-			<version>1.7.26</version>
+			<version>1.7.36</version>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
-			<version>1.2.3</version>
+			<version>1.4.0</version>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-core</artifactId>
-			<version>1.2.3</version>
+			<version>1.4.0</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
 			<artifactId>lombok</artifactId>
-			<version>1.18.8</version>
+			<version>1.18.24</version>
 			<scope>provided</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-lang3</artifactId>
-			<version>3.9</version>
+			<version>3.12.0</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-io</groupId>
 			<artifactId>commons-io</artifactId>
-			<version>2.6</version>
+			<version>2.11.0</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -83,18 +83,18 @@
 					<target>${jdk.version}</target>
 					<encoding>utf-8</encoding>
 				</configuration>
-				<version>3.8.1</version>
+				<version>3.10.1</version>
 			</plugin>
 			<plugin>
 				<artifactId>maven-resources-plugin</artifactId>
-				<version>3.1.0</version>
+				<version>3.3.0</version>
 				<configuration>
 					<encoding>UTF-8</encoding>
 				</configuration>
 			</plugin>
 			<plugin>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>3.0.1</version>
+				<version>3.2.1</version>
 				<configuration>
 					<attach>true</attach>
 				</configuration>
@@ -107,74 +107,88 @@
 					</execution>
 				</executions>
 			</plugin>
-			<plugin>  
-                <groupId>org.apache.maven.plugins</groupId>  
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>3.2.1</version>
-                <executions>  
-                    <execution>  
-                        <phase>package</phase>  
-                        <goals>  
-                            <goal>shade</goal>  
-                        </goals>  
-                    </execution>  
-                </executions>  
-                <configuration>  
-                    <shadedArtifactAttached>true</shadedArtifactAttached>  
-                    <shadedClassifierName>shaded</shadedClassifierName>  
-                    <transformers>  
-                        <transformer  
-                            implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">  
-                            <mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>  
-                        </transformer>  
-                    </transformers>  
-                </configuration>  
-            </plugin>  
-			<plugin>  
-                <groupId>com.akathist.maven.plugins.launch4j</groupId>  
-                <artifactId>launch4j-maven-plugin</artifactId>
-                <version>1.7.25</version>
-                <executions>  
-                    <execution>  
-                        <id>l4j-clui</id>  
-                        <phase>package</phase>  
-                        <goals>  
-                            <goal>launch4j</goal>  
-                        </goals>  
-                        <configuration>  
-                            <headerType>gui</headerType>  
-                            <jar>${project.build.directory}/${project.artifactId}-${project.version}-shaded.jar</jar>  
-                            <outfile>${project.build.directory}/video-manager.exe</outfile>  
-                            <downloadUrl>http://java.com/download</downloadUrl>  
-                            <classPath>  
-                                <mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>  
-                                <preCp>anything</preCp>  
-                            </classPath>  
-                            <icon>src/main/resources/0.ico</icon>  
-                            <jre>  
-                                <minVersion>1.8</minVersion>  
-                                <jdkPreference>preferJre</jdkPreference>
-                                <maxHeapSize>256</maxHeapSize>
-                                <initialHeapSize>64</initialHeapSize>  
-                            </jre>
-                            <versionInfo>  
-                                <fileVersion>1.0.0.0</fileVersion>  
-                                <txtFileVersion>${project.version}</txtFileVersion>  
-                                <fileDescription>${project.name}</fileDescription>  
-                                <copyright>2019 springtour.cn</copyright>  
-                                <productVersion>1.0.0.0</productVersion>  
-                                <txtProductVersion>1.0.0.0</txtProductVersion>  
-                                <productName>${project.name}</productName>  
-                                <companyName>springtour.com</companyName>  
-                                <internalName>video-manager</internalName>
-                                <originalFilename>video-manager.exe</originalFilename>  
-                                
-                            </versionInfo>  
-                        </configuration>  
-                    </execution>  
-                </executions>  
-            </plugin>  
-			
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-shade-plugin</artifactId>
+				<version>3.3.0</version>
+				<executions>
+					<execution>
+						<phase>package</phase>
+						<goals>
+							<goal>shade</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<shadedArtifactAttached>true</shadedArtifactAttached>
+					<shadedClassifierName>shaded</shadedClassifierName>
+					<transformers>
+						<transformer
+							implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+							<mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>
+						</transformer>
+					</transformers>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>com.akathist.maven.plugins.launch4j</groupId>
+				<artifactId>launch4j-maven-plugin</artifactId>
+				<version>2.1.2</version>
+				<executions>
+					<execution>
+						<id>l4j-clui</id>
+						<phase>package</phase>
+						<goals>
+							<goal>launch4j</goal>
+						</goals>
+						<configuration>
+							<headerType>gui</headerType>
+							<jar>${project.build.directory}/${project.artifactId}-${project.version}-shaded.jar</jar>
+							<outfile>${project.build.directory}/video-manager.exe</outfile>
+							<downloadUrl>http://java.com/download</downloadUrl>
+							<classPath>
+								<mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>
+								<preCp>anything</preCp>
+							</classPath>
+							<singleInstance>
+								<mutexName>单实例</mutexName>
+								<windowTitle>警告</windowTitle>
+							</singleInstance>
+							<icon>src/main/resources/0.ico</icon>
+							<jre>
+								<path>${JAVA_HOME}/jre</path>
+								<minVersion>1.8</minVersion>
+								<bundledJre64Bit>true</bundledJre64Bit>
+								<bundledJreAsFallback>true</bundledJreAsFallback>
+								<jdkPreference>preferJdk</jdkPreference>
+								<maxHeapSize>256</maxHeapSize>
+								<initialHeapSize>64</initialHeapSize>
+							</jre>
+							<versionInfo>
+								<fileVersion>1.0.0.0</fileVersion>
+								<txtFileVersion>${project.version}</txtFileVersion>
+								<fileDescription>${project.name}</fileDescription>
+								<copyright>2022 springtour.cn</copyright>
+								<productVersion>1.0.0.0</productVersion>
+								<txtProductVersion>1.0.0.0</txtProductVersion>
+								<productName>${project.name}</productName>
+								<companyName>springtour.com</companyName>
+								<internalName>video-manager</internalName>
+								<originalFilename>video-manager.exe</originalFilename>
+								<language>SIMPLIFIED_CHINESE</language>
+							</versionInfo>
+							<messages>
+								<startupErr>启动失败</startupErr>
+								<bundledJreErr>绑定JRE失败</bundledJreErr>
+								<jreVersionErr>Java版本错误</jreVersionErr>
+								<launcherErr>启动失败</launcherErr>
+								<!-- Used by console header only. -->
+								<instanceAlreadyExistsMsg>实例已经启动</instanceAlreadyExistsMsg>
+							</messages>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
-		</build>
+	</build>
 </project>

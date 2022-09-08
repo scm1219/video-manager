@@ -24,7 +24,7 @@ public class DiskManager {
 		new Thread(new Runnable() {
 			@Override
 			public void run() {
-				ZhConverterUtil.convertToSimple("test");
+				ZhConverterUtil.toSimple("test");
 			}
 		}).start();
 		
