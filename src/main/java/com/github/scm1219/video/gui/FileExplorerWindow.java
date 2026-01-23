@@ -22,6 +22,7 @@ import java.util.Stack;
 import java.util.Vector;
 
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JFrame;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -49,12 +50,16 @@ import com.github.scm1219.video.gui.tree.FileTreeCellRenderer;
 import com.github.scm1219.video.gui.tree.FileTreeNode;
 import com.github.scm1219.utils.FileUtils;
 
+import java.awt.Font;
+
 public class FileExplorerWindow extends JFrame {
 	private static final long serialVersionUID = 1L;
 	private JPanel pnlTop;
     private JPanel pnlLeft;
     private JPanel pnlRight;
+    private JPanel pnlIndexInfo;
     private JSplitPane spBottom;
+    private JSplitPane spLeft;
     private JTextField tfDir;
     private JTextField tfSearch;
     private FileTreeNode fileTreeRoot;
@@ -65,9 +70,13 @@ public class FileExplorerWindow extends JFrame {
     private JButton btnSearch;
     private JButton btnCleanSearch;
     private JButton btnSearchDir;
+    private JButton btnRefresh;
+    private JCheckBox chkVideoOnly;
     private JScrollPane spTable;
+    private JScrollPane spIndexInfo;
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private JPopupMenu menu = new JPopupMenu();
+    private boolean videoOnly = false;
 
     private void initData(){
         stackFile = new Stack<File>();
@@ -96,7 +105,9 @@ public class FileExplorerWindow extends JFrame {
         pnlTop = new JPanel();
         pnlLeft = new JPanel();
         pnlRight = new JPanel();
+        pnlIndexInfo = new JPanel();
         spBottom = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        spLeft = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         tfDir = new JTextField();
         tfSearch =  new JTextField();
         trFileTree = new FileTree();
@@ -105,6 +116,8 @@ public class FileExplorerWindow extends JFrame {
         btnSearch =  new JButton("搜索文件");
         btnCleanSearch =  new JButton("清空搜索");
         btnSearchDir = new JButton("搜索文件夹");
+        btnRefresh = new JButton("刷新磁盘");
+        chkVideoOnly = new JCheckBox("只显示视频文件");
         JMenuItem mEchoIndexInfo;
 		mEchoIndexInfo = new JMenuItem("打开所在文件夹");
 		menu.add(mEchoIndexInfo);
@@ -115,7 +128,15 @@ public class FileExplorerWindow extends JFrame {
 				FileTable fileTable = (FileTable)menu.getInvoker();
 				int row =fileTable.getSelectedRow();
                 File file = (File) fileTable.getValueAt(row, 0);
-                FileUtils.openDir(file.getParentFile());
+                File parentDir = file.getParentFile();
+                String dirPath = parentDir.getAbsolutePath();
+                if (ClickDebouncer.shouldOpen(dirPath)) {
+                    try {
+                        FileUtils.openDir(parentDir);
+                    } catch (Exception ex) {
+                        ClickDebouncer.recordError(dirPath);
+                    }
+                }
 			}
 		});
     }
@@ -156,11 +177,17 @@ public class FileExplorerWindow extends JFrame {
     private void setFileTable(File[] files) {
     	Vector<File> vFile = new Vector<File>();
         for (int i = 0; i < files.length; i++){
-            vFile.add(files[i]);
+            if (videoOnly) {
+                if (files[i].isDirectory() || FileUtils.isVideoFile(files[i])) {
+                    vFile.add(files[i]);
+                }
+            } else {
+                vFile.add(files[i]);
+            }
         }
         Collections.sort(vFile, FILE_COMPARATOR);
         Object[][] fileData;
-        fileData = new Object[files.length][5];
+        fileData = new Object[vFile.size()][5];
         for (int i = 0; i < fileData.length; i++){
             for (int j = 0; j < 5; j++){
                 fileData[i][j] = vFile.elementAt(i);
@@ -182,6 +209,73 @@ public class FileExplorerWindow extends JFrame {
     }
 
     private File currentDir = null;
+    
+    private void updateIndexInfo() {
+    	StringBuilder info = new StringBuilder();
+    	info.append("<html><body style='padding: 10px; font-family: sans-serif;'>");
+    	info.append("<h3 style='margin-top: 0; color: #333;'>索引信息</h3>");
+    	
+    	List<Disk> disks = DiskManager.getInstance().listDisk();
+    	info.append("<p><strong>索引磁盘数量:</strong> ").append(disks.size()).append("</p>");
+    	
+    	if (!disks.isEmpty()) {
+    		info.append("<p><strong>磁盘列表:</strong></p>");
+    		info.append("<ul>");
+    		for (Disk disk : disks) {
+    			String displayName = fileSystemView.getSystemDisplayName(disk.getRoot());
+    			if (displayName == null || displayName.isEmpty()) {
+    				displayName = disk.getPath();
+    			}
+    			info.append("<li>").append(displayName).append(" (").append(disk.getPath()).append(")</li>");
+    		}
+    		info.append("</ul>");
+    	}
+    	
+    	info.append("<p style='color: #666; '>提示: 双击视频文件可直接播放</p>");
+    	info.append("</body></html>");
+    	
+    	pnlIndexInfo.removeAll();
+    	javax.swing.JLabel lblInfo = new javax.swing.JLabel(info.toString());
+    	lblInfo.setFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
+    	pnlIndexInfo.setLayout(new java.awt.BorderLayout());
+    	pnlIndexInfo.add(lblInfo, java.awt.BorderLayout.NORTH);
+    	pnlIndexInfo.revalidate();
+    	pnlIndexInfo.repaint();
+    }
+
+    private void refreshTree() {
+    	DiskManager.getInstance().reloadDisks();
+    	initData();
+    	
+    	DefaultTreeModel dfTreeModel = new DefaultTreeModel(fileTreeRoot) {
+			private static final long serialVersionUID = 1L;
+
+			@Override
+            public boolean isLeaf(Object node) {
+                FileTreeNode treeNode = (FileTreeNode) node;
+                if (treeNode.isDummyRoot()){
+                    return false;
+                }
+                return ((File)treeNode.getUserObject()).isFile();
+            }
+        };
+        trFileTree.setModel(dfTreeModel);
+        trFileTree.setCellRenderer(new FileTreeCellRenderer());
+        trFileTree.setRootVisible(false);
+        if (trFileTree.getRowCount() > 0) {
+        	trFileTree.setSelectionRow(0);
+        }
+        
+        updateIndexInfo();
+        
+        List<Disk> disks = DiskManager.getInstance().listDisk();
+        if(disks.size()<1) {
+        	JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "提示", MessageType.INFO.ordinal());
+        } else {
+        	JOptionPane.showMessageDialog(null, "刷新成功，共发现 "+disks.size()+" 个需要索引的磁盘", "提示", MessageType.INFO.ordinal());
+        }
+    }
+    
     private void updateTable(File file, Boolean isBack){
         String path = file.getAbsolutePath();
         if (path == null)
@@ -235,7 +329,14 @@ public class FileExplorerWindow extends JFrame {
 //                	trFileTree.setSelectionPath(path);
                 } else if (e.getClickCount() == 2){
                 	if(FileUtils.isVideoFile(file)) {
-                		FileUtils.openVideoFile(file);
+                		String filePath = file.getAbsolutePath();
+                		if (ClickDebouncer.shouldOpen(filePath)) {
+                			try {
+                				FileUtils.openVideoFile(file);
+                			} catch (Exception ex) {
+                				ClickDebouncer.recordError(filePath);
+                			}
+                		}
                 	}else if(file.isDirectory()){
                 		updateTable(file, false);
                 	}
@@ -286,6 +387,23 @@ public class FileExplorerWindow extends JFrame {
 				}
 			}
 		});
+
+        chkVideoOnly.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                videoOnly = chkVideoOnly.isSelected();
+                if (currentDir != null) {
+                    updateTable(currentDir, true);
+                }
+            }
+        });
+
+        btnRefresh.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshTree();
+            }
+        });
     }
 
     private void initComponent(){
@@ -316,8 +434,20 @@ public class FileExplorerWindow extends JFrame {
         JScrollPane scroll = new JScrollPane(trFileTree);
         scroll.setLayout(new ScrollPaneLayout());
         scroll.getViewport().setBackground(Color.WHITE);
+        
+        spIndexInfo = new JScrollPane(pnlIndexInfo);
+        spIndexInfo.setBackground(Color.white);
+        spIndexInfo.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        spIndexInfo.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        spIndexInfo.setPreferredSize(new Dimension(200, 150));
+        spIndexInfo.setMinimumSize(new Dimension(200, 100));
+        
+        spLeft.setTopComponent(scroll);
+        spLeft.setBottomComponent(spIndexInfo);
+        spLeft.setResizeWeight(0.8);
+        
         pnlLeft.setLayout(new GridBagLayout());
-        pnlLeft.add(scroll, new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
+        pnlLeft.add(spLeft, new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
         pnlRight.setLayout(new GridBagLayout());
@@ -330,17 +460,21 @@ public class FileExplorerWindow extends JFrame {
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
         pnlTop.add(btnSearchDir,new GridBagConstraints(1, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(1, 0, 0, 0), 0, 0));
-        pnlTop.add(tfSearch,new GridBagConstraints(2, 0, 1, 1, 0.9, 1.0, GridBagConstraints.EAST,
+        pnlTop.add(tfSearch,new GridBagConstraints(2, 0, 1, 1, 0.85, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        
-        
+        pnlTop.add(chkVideoOnly, new GridBagConstraints(3, 0, 1, 1, 0.05, 1.0, GridBagConstraints.EAST,
+                GridBagConstraints.BOTH, new Insets(0, 5, 0, 0), 0, 0));
+
+
         //路径
         pnlTop.add(btnBack, new GridBagConstraints(0, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
         pnlTop.add(btnCleanSearch, new GridBagConstraints(1, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        
+
         pnlTop.add(tfDir,new GridBagConstraints(2, 1, 1, 1, 0.9, 1.0, GridBagConstraints.EAST,
+                GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
+        pnlTop.add(btnRefresh, new GridBagConstraints(3, 1, 1, 1, 0.05, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
         spBottom.setLeftComponent(pnlLeft);
@@ -353,6 +487,9 @@ public class FileExplorerWindow extends JFrame {
                 GridBagConstraints.BOTH, new Insets(2, 0, 0, 0), 0, 0));
         container.add(spBottom, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.95, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(4, 2, 2, 2), 0, 0));
+        
+        updateIndexInfo();
+        
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         this.setBounds(screenSize.width/2 - width/2, screenSize.height/2 - height/2, width, height);
         this.setMinimumSize(new Dimension(width, height));

@@ -12,10 +12,11 @@ public class DiskUtils {
 	
 	public static String getSmartInfo(Disk disk) {
 		
-		Runtime runtime = Runtime.getRuntime();
 		try {
-			String cmd = "smartctl -a "+disk.getVolumeName();
-			BufferedReader br = new BufferedReader(new InputStreamReader(runtime.exec(cmd).getInputStream()));
+			ProcessBuilder processBuilder = new ProcessBuilder("smartctl.exe", "-d", "ata", "-A", disk.getVolumeName());
+			Process process = processBuilder.start();
+			BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
+			
 			String line = null;
 			StringBuffer b = new StringBuffer();
 			boolean start=false;

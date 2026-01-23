@@ -13,7 +13,8 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jdk.version>11</jdk.version>
+		<jdk.version>21</jdk.version>
+		<java.home>F:\tools\jdk-21</java.home>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -156,11 +157,11 @@
 							</singleInstance>
 							<icon>src/main/resources/0.ico</icon>
 							<jre>
-								<path>${JAVA_HOME}/jre</path>
+								<path>${java.home}</path>
 								<minVersion>${jdk.version}</minVersion>
-								<bundledJre64Bit>true</bundledJre64Bit>
-								<bundledJreAsFallback>true</bundledJreAsFallback>
-								<jdkPreference>preferJdk</jdkPreference>
+								<requires64Bit>true</requires64Bit>
+								<requiresJdk>true</requiresJdk>
+								<requiresJdk>preferJdk</requiresJdk>
 								<maxHeapSize>256</maxHeapSize>
 								<initialHeapSize>64</initialHeapSize>
 							</jre>
@@ -179,7 +180,7 @@
 							</versionInfo>
 							<messages>
 								<startupErr>启动失败</startupErr>
-								<bundledJreErr>绑定JRE失败</bundledJreErr>
+								<jreNotFoundErr>绑定JRE失败</jreNotFoundErr>
 								<jreVersionErr>Java版本错误</jreVersionErr>
 								<launcherErr>启动失败</launcherErr>
 								<!-- Used by console header only. -->

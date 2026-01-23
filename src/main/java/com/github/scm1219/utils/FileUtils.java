@@ -72,24 +72,34 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
         }
         return fileSizeString;
     }
-	
+
 	public static void openVideoFile(File f) {
-		Runtime runtime = Runtime.getRuntime();
+		if (f == null) {
+			log.warn("文件为空，无法打开");
+			return;
+		}
+		String filePath = f.getAbsolutePath();
 		try {
-			log.info("尝试调用系统命令打开文件："+f.getAbsolutePath());
-			runtime.exec("rundll32 url.dll FileProtocolHandler " + f.getAbsolutePath());
+			log.info("尝试调用系统命令打开文件："+filePath);
+			ProcessBuilder processBuilder = new ProcessBuilder("rundll32", "url.dll", "FileProtocolHandler", filePath);
+			processBuilder.start();
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			log.error("打开文件失败："+filePath, ex);
 		}
 	}
-	
+
 	public static void openDir(File dir) {
-		Runtime runtime = Runtime.getRuntime();
+		if (dir == null) {
+			log.warn("文件夹为空，无法打开");
+			return;
+		}
+		String dirPath = dir.getAbsolutePath();
 		try {
-			log.info("尝试调用系统命令打开文件夹："+dir.getAbsolutePath());
-			runtime.exec("rundll32 url.dll FileProtocolHandler " + dir.getAbsolutePath());
+			log.info("尝试调用系统命令打开文件夹："+dirPath);
+			ProcessBuilder processBuilder = new ProcessBuilder("rundll32", "url.dll", "FileProtocolHandler", dirPath);
+			processBuilder.start();
 		} catch (Exception ex) {
-			ex.printStackTrace();
+			log.error("打开文件夹失败："+dirPath, ex);
 		}
 	}
 }

@@ -88,4 +88,9 @@ public class DiskManager {
 		return Collections.unmodifiableList(disks);
 	}
 
+	public void reloadDisks() {
+		disks.clear();
+		loadDisks();
+	}
+
 }

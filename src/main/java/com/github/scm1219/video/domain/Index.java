@@ -47,11 +47,11 @@ public class Index {
 				@Override
 				public void run() {
 					try(Connection conn =getConnection()){
+						conn.createStatement().executeQuery("select 1");
 						log.debug("sqlite数据库链接正常");
 					}catch (Exception e) {
 						e.printStackTrace();
 					}
-					
 				}
 			}).start();
 		}
