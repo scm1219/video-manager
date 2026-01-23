@@ -7,8 +7,11 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 @Slf4j
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class FileUtils extends org.apache.commons.io.FileUtils{
 
 	private static String[] videoExtends = { ".mp4", ".mkv", ".rm", ".rmvb", "wmv", ".flv",".ogm" };

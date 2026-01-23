@@ -14,7 +14,7 @@ public class DiskUtils {
 		
 		Runtime runtime = Runtime.getRuntime();
 		try {
-			String cmd = "smartctl.exe -A "+disk.getVolumeName();
+			String cmd = "smartctl -a "+disk.getVolumeName();
 			BufferedReader br = new BufferedReader(new InputStreamReader(runtime.exec(cmd).getInputStream()));
 			String line = null;
 			StringBuffer b = new StringBuffer();
