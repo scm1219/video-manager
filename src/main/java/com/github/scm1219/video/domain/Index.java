@@ -48,7 +48,8 @@ public class Index {
 				public void run() {
 					try(Connection conn =getConnection()){
 						conn.createStatement().executeQuery("select 1");
-						log.debug("sqlite数据库链接正常");
+						String rootDrive = indexFile.getAbsolutePath().split(":")[0] + ":";
+						log.debug(rootDrive + "\\ sqlite数据库链接正常");
 					}catch (Exception e) {
 						e.printStackTrace();
 					}
