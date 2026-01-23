@@ -12,3 +12,4 @@
 /*.properties
 /*.properties.lock
 /.sts4-cache
+/dependency-reduced-pom.xml
