@@ -21,8 +21,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
-import java.util.Vector;
-
+import javax.swing.SwingUtilities;
+import javax.swing.SwingWorker;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
@@ -186,22 +186,21 @@ public class FileExplorerWindow extends JFrame {
      * @param files
      */
     private void setFileTable(File[] files) {
-    	Vector<File> vFile = new Vector<File>();
+    	List<File> fileList = new java.util.ArrayList<File>();
         for (int i = 0; i < files.length; i++){
             if (videoOnly) {
                 if (files[i].isDirectory() || FileUtils.isVideoFile(files[i])) {
-                    vFile.add(files[i]);
+                    fileList.add(files[i]);
                 }
             } else {
-                vFile.add(files[i]);
+                fileList.add(files[i]);
             }
         }
-        Collections.sort(vFile, FILE_COMPARATOR);
-        Object[][] fileData;
-        fileData = new Object[vFile.size()][5];
+        Collections.sort(fileList, FILE_COMPARATOR);
+        Object[][] fileData = new Object[fileList.size()][5];
         for (int i = 0; i < fileData.length; i++){
             for (int j = 0; j < 5; j++){
-                fileData[i][j] = vFile.elementAt(i);
+                fileData[i][j] = fileList.get(i);
             }
         }
 
@@ -210,7 +209,6 @@ public class FileExplorerWindow extends JFrame {
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
         sort.setComparator(0, FILE_COMPARATOR);
         tbFile.setRowSorter(sort);
-        // 设置table 列宽
         tbFile.getColumnModel().getColumn(0).setPreferredWidth(180);
         tbFile.getColumnModel().getColumn(1).setPreferredWidth(120);
         tbFile.getColumnModel().getColumn(2).setPreferredWidth(80);
@@ -298,8 +296,27 @@ public class FileExplorerWindow extends JFrame {
         if (!isBack){
             stackFile.push(file);
         }
-        File[] files = fileSystemView.getFiles(file, false);
-        setFileTable(files);
+        
+        final File targetFile = file;
+        final Boolean isBackOperation = isBack;
+        
+        SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
+            @Override
+            protected File[] doInBackground() {
+                return fileSystemView.getFiles(targetFile, false);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    File[] files = get();
+                    setFileTable(files);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        };
+        worker.execute();
     }
 
     private void AddComponentListener(){

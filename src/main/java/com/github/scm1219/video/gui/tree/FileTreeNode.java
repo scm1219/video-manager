@@ -6,6 +6,8 @@ import javax.swing.Icon;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.tree.DefaultMutableTreeNode;
 
+import com.github.scm1219.video.gui.IconCache;
+
 public class FileTreeNode extends DefaultMutableTreeNode {
 	private static final long serialVersionUID = 1L;
 
@@ -34,8 +36,8 @@ public class FileTreeNode extends DefaultMutableTreeNode {
     public FileTreeNode(File file, boolean isDummyRoot, boolean allowsChildren){
         super(file, allowsChildren);
         this.file = file;
-        this.fileName = fileSystemView.getSystemDisplayName(file);
-        this.fileIcon = fileSystemView.getSystemIcon(file);
+        this.fileName = IconCache.getSystemDisplayName(file);
+        this.fileIcon = IconCache.getSystemIcon(file);
         this.isDummyRoot = isDummyRoot;
     }
 

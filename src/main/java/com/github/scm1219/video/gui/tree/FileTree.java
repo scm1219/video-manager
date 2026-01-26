@@ -13,9 +13,11 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.JTree;
+import javax.swing.SwingWorker;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
 import javax.swing.filechooser.FileSystemView;
+import javax.swing.tree.DefaultTreeModel;
 import javax.swing.tree.ExpandVetoException;
 import javax.swing.tree.TreePath;
 
@@ -161,21 +163,35 @@ public class FileTree extends JTree {
 			public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
 				FileTreeNode fileNode = (FileTreeNode) event.getPath().getLastPathComponent();
 				if (!fileNode.isInit()) {
-					File[] files;
-					if (fileNode.isDummyRoot()) {
-						files = fileSystemView.getRoots();
-					} else {
-						files = fileSystemView.getFiles(fileNode.getFile(), false);
-					}
-
-					for (int i = 0; i < files.length; i++) {
-						if (files[i].isDirectory()) {
-							FileTreeNode childFileNode = new FileTreeNode(files[i]);
-							fileNode.add(childFileNode);
+					SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
+						@Override
+						protected File[] doInBackground() {
+							if (fileNode.isDummyRoot()) {
+								return fileSystemView.getRoots();
+							} else {
+								return fileSystemView.getFiles(fileNode.getFile(), false);
+							}
 						}
-					}
+
+						@Override
+						protected void done() {
+							try {
+								File[] files = get();
+								for (File file : files) {
+									if (file.isDirectory()) {
+										FileTreeNode childFileNode = new FileTreeNode(file);
+										fileNode.add(childFileNode);
+									}
+								}
+								fileNode.setInit(true);
+								((DefaultTreeModel)getModel()).nodeStructureChanged(fileNode);
+							} catch (Exception ex) {
+								ex.printStackTrace();
+							}
+						}
+					};
+					worker.execute();
 				}
-				fileNode.setInit(true);
 			}
 
 			@Override

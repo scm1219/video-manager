@@ -10,6 +10,7 @@ import javax.swing.table.TableCellRenderer;
 
 import com.github.scm1219.utils.DateUtils;
 import com.github.scm1219.utils.FileUtils;
+import com.github.scm1219.video.gui.IconCache;
 
 public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
 	private static final long serialVersionUID = 1L;
@@ -22,20 +23,16 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
         if (isSelected) {
             this.setBackground(table.getSelectionBackground());
             this.setForeground(table.getSelectionForeground());
-//            fileTable.setShowHorizontalLines(true);
-//            fileTable.setShowVerticalLines(true);
         }
         else {
             this.setBackground(table.getBackground());
             this.setForeground(table.getForeground());
-//            fileTable.setShowHorizontalLines(false);
-//            fileTable.setShowVerticalLines(false);
         }
 
         if (column == 0)  {
             File file = (File) value;
-            this.setText(fileSystemView.getSystemDisplayName(file));
-            this.setIcon(fileSystemView.getSystemIcon(file));
+            this.setText(IconCache.getSystemDisplayName(file));
+            this.setIcon(IconCache.getSystemIcon(file));
         }
         else if (column == 1) {
             long datetime = (long)value;
@@ -62,6 +59,4 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
         }
         return this;
     }
-
-    
 }
