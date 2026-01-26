@@ -39,6 +39,8 @@ import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultTreeModel;
+import javax.swing.tree.TreeNode;
+import javax.swing.tree.TreePath;
 
 import org.apache.commons.lang3.StringUtils;
 
@@ -311,6 +313,15 @@ public class FileExplorerWindow extends JFrame {
     }
 
     private void refreshTree(boolean showPrompt) {
+    	// 保存当前选中的文件
+    	TreePath selectedPath = trFileTree.getSelectionPath();
+    	File selectedFile = null;
+    	if (selectedPath != null) {
+    		FileTreeNode node = (FileTreeNode) selectedPath.getLastPathComponent();
+    		selectedFile = node.getFile();
+    	}
+
+    	// 执行刷新逻辑
     	DiskManager.getInstance().reloadDisks();
     	initData();
 
@@ -329,7 +340,11 @@ public class FileExplorerWindow extends JFrame {
         trFileTree.setModel(dfTreeModel);
         trFileTree.setCellRenderer(new FileTreeCellRenderer());
         trFileTree.setRootVisible(false);
-        if (trFileTree.getRowCount() > 0) {
+
+        // 恢复选择或选择第一个
+        if (selectedFile != null) {
+        	restoreSelection(selectedFile);
+        } else if (trFileTree.getRowCount() > 0) {
         	trFileTree.setSelectionRow(0);
         }
 
@@ -344,7 +359,32 @@ public class FileExplorerWindow extends JFrame {
         	}
         }
     }
-    
+
+    /**
+     * 恢复树的选择到指定的文件
+     * @param targetFile 目标文件对象
+     */
+    private void restoreSelection(File targetFile) {
+    	TreeNode root = (TreeNode) trFileTree.getModel().getRoot();
+
+    	// 遍历根节点查找匹配的磁盘
+    	for (int i = 0; i < root.getChildCount(); i++) {
+    		FileTreeNode child = (FileTreeNode) root.getChildAt(i);
+    		if (child.getFile().equals(targetFile)) {
+    			// 找到匹配，设置选中路径
+    			TreePath path = new TreePath(new Object[]{root, child});
+    			trFileTree.setSelectionPath(path);
+    			trFileTree.scrollPathToVisible(path);
+    			return;
+    		}
+    	}
+
+    	// 未找到匹配，选择第一个
+    	if (trFileTree.getRowCount() > 0) {
+    		trFileTree.setSelectionRow(0);
+    	}
+    }
+
     private void updateTable(File file, Boolean isBack){
         String path = file.getAbsolutePath();
         if (path == null)
@@ -502,8 +542,12 @@ public class FileExplorerWindow extends JFrame {
         chkShowAllDisks.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                showAllDisks = chkShowAllDisks.isSelected();
-                refreshTree(false);
+                boolean newShowAllDisks = chkShowAllDisks.isSelected();
+                // 仅当状态真正改变时才刷新
+                if (newShowAllDisks != showAllDisks) {
+                    showAllDisks = newShowAllDisks;
+                    refreshTree(false);
+                }
             }
         });
 
