@@ -170,6 +170,13 @@ public class FileExplorerWindow extends JFrame {
             }
         }
     };
+
+    public static final Comparator<Long> FILE_SIZE_COMPARATOR = new Comparator<Long>() {
+        @Override
+        public int compare(Long size1, Long size2) {
+            return Long.compare(size1, size2);
+        }
+    };
     
     /**
      * 更新搜索结果
@@ -208,6 +215,7 @@ public class FileExplorerWindow extends JFrame {
         tbFile.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
         sort.setComparator(0, FILE_COMPARATOR);
+        sort.setComparator(3, FILE_SIZE_COMPARATOR);
         tbFile.setRowSorter(sort);
         tbFile.getColumnModel().getColumn(0).setPreferredWidth(180);
         tbFile.getColumnModel().getColumn(1).setPreferredWidth(120);
