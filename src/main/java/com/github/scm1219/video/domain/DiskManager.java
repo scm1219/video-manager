@@ -65,8 +65,13 @@ public class DiskManager {
 	}
 	
 	public Disk findDisk(File file) {
+		// 获取文件的绝对路径
+		String filePath = file.getAbsolutePath();
+
 		for (Disk disk : disks) {
-			if(disk.getRoot().equals(file)) {
+			// 检查文件路径是否以该磁盘根路径开头
+			String rootPath = disk.getRoot().getAbsolutePath();
+			if (filePath.startsWith(rootPath)) {
 				return disk;
 			}
 		}

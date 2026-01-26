@@ -50,6 +50,7 @@ import com.github.scm1219.video.gui.table.FileTableModel;
 import com.github.scm1219.video.gui.tree.FileTree;
 import com.github.scm1219.video.gui.tree.FileTreeCellRenderer;
 import com.github.scm1219.video.gui.tree.FileTreeNode;
+import com.github.scm1219.video.gui.tree.FileUpdateProcesser;
 import com.github.scm1219.utils.FileUtils;
 
 import java.awt.Font;
@@ -134,7 +135,7 @@ public class FileExplorerWindow extends JFrame {
 		mEchoIndexInfo = new JMenuItem("打开所在文件夹");
 		menu.add(mEchoIndexInfo);
 		mEchoIndexInfo.addActionListener(new ActionListener() {
-			
+
 			@Override
 			public void actionPerformed(ActionEvent e) {
 				FileTable fileTable = (FileTable)menu.getInvoker();
@@ -148,6 +149,56 @@ public class FileExplorerWindow extends JFrame {
                         ClickDebouncer.recordError(filePath);
                     }
                 }
+			}
+		});
+
+		// 新增：扫描此目录菜单项
+		JMenuItem mScanDirectory;
+		mScanDirectory = new JMenuItem("扫描此目录");
+		menu.add(mScanDirectory);
+		mScanDirectory.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				FileTable fileTable = (FileTable)menu.getInvoker();
+				int row = fileTable.getSelectedRow();
+                File file = (File) fileTable.getValueAt(row, 0);
+
+                // 确定要扫描的目录
+                File targetDir;
+                if(file.isDirectory()) {
+                	targetDir = file;
+                } else {
+                	targetDir = file.getParentFile();
+                }
+
+                // 查找磁盘
+                Disk disk = DiskManager.getInstance().findDisk(targetDir);
+                if(disk == null) {
+                	JOptionPane.showMessageDialog(null,
+                			"该磁盘未启用索引功能\n请在磁盘根目录创建 " + Disk.FLAF_FILE + " 文件",
+                			"提示",
+                			MessageType.INFO.ordinal());
+                	return;
+                }
+
+                // 检查是否正在索引
+                if(disk.getIndex().isIndexing()) {
+                	JOptionPane.showMessageDialog(null,
+                			"索引正在创建中，请稍后",
+                			"提示",
+                			MessageType.INFO.ordinal());
+                	return;
+                }
+
+                // 启动目录扫描
+                new Thread(new Runnable() {
+                	@Override
+                	public void run() {
+                		FileUpdateProcesser pro = new FileUpdateProcesser(disk, targetDir);
+                		pro.setVisible(true);
+                	}
+                }).start();
 			}
 		});
     }

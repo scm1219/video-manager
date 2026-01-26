@@ -245,5 +245,145 @@ public class Index {
 		return count;
 	}
 
-	
+	/**
+	 * 为指定目录创建索引（先删除旧记录，再扫描并插入新记录）
+	 * @param directory 要扫描的目录
+	 * @param bar 进度条（可为null）
+	 */
+	public void createForDirectory(File directory, JProgressBar bar) {
+		if(bar!=null) {
+			bar.setString("开始扫描目录: " + directory.getName());
+		}
+		log.info("为目录{}创建索引", directory.getAbsolutePath());
+
+		try(Connection connection=getConnection()) {
+			connection.setAutoCommit(true);
+
+			// 获取目录路径（去掉盘符，统一格式）
+			String dirPath = directory.getAbsolutePath();
+			if(dirPath.contains(":")) {
+				dirPath = dirPath.substring(dirPath.indexOf(":") + 1);
+			}
+			// 确保路径以/开头
+			if(!dirPath.startsWith("/") && !dirPath.startsWith("\\")) {
+				dirPath = "/" + dirPath;
+			}
+			// 统一使用/作为路径分隔符
+			dirPath = dirPath.replace("\\", "/");
+
+			if(bar!=null) {
+				bar.setString("删除旧索引记录...");
+			}
+
+			// 删除该目录下的所有旧记录
+			try(Statement stmt = connection.createStatement()) {
+				String deleteSql = "DELETE FROM files WHERE dirPath LIKE '" + dirPath + "%'";
+				log.debug("执行删除SQL: {}", deleteSql);
+				stmt.executeUpdate(deleteSql);
+			}
+
+			if(bar!=null) {
+				bar.setString("扫描视频文件...");
+			}
+
+			// 收集所有视频文件
+			List<File> videoFiles = new ArrayList<>();
+			collectVideoFiles(directory, videoFiles, bar);
+
+			if(bar!=null) {
+				bar.setValue(50);
+				bar.setString("插入索引记录...");
+			}
+
+			// 批量插入视频文件记录
+			try(PreparedStatement pstmt = connection.prepareStatement(
+					"INSERT INTO files (fileName, dirName, filePath, dirPath) VALUES (?, ?, ?, ?)")) {
+
+				int count = 0;
+				int totalFiles = videoFiles.size();
+				int processedFiles = 0;
+
+				for(File videoFile : videoFiles) {
+					log.debug("处理文件: {}", videoFile.getAbsolutePath());
+
+					String fileName = getString(videoFile.getName());
+					File parentDir = videoFile.getParentFile();
+					String dirName = getString(parentDir.getName());
+					String filePath = videoFile.getAbsolutePath().substring(videoFile.getAbsolutePath().indexOf(":") + 1);
+					String fileDirPath = parentDir.getAbsolutePath().substring(parentDir.getAbsolutePath().indexOf(":") + 1);
+					// 统一路径分隔符
+					filePath = filePath.replace("\\", "/");
+					fileDirPath = fileDirPath.replace("\\", "/");
+
+					pstmt.setString(1, fileName);
+					pstmt.setString(2, dirName);
+					pstmt.setString(3, filePath);
+					pstmt.setString(4, fileDirPath);
+					pstmt.addBatch();
+					count++;
+
+					// 更新进度
+					processedFiles++;
+					if(bar!=null && totalFiles > 0) {
+						int progress = 50 + (processedFiles * 50 / totalFiles);
+						bar.setValue(progress);
+						bar.setString("正在处理 " + processedFiles + "/" + totalFiles);
+					}
+
+					// 每100条执行一次批量插入
+					if(count >= 100) {
+						pstmt.executeBatch();
+						count = 0;
+					}
+				}
+
+				// 插入剩余记录
+				if(count > 0) {
+					pstmt.executeBatch();
+				}
+			}
+
+			if(bar!=null) {
+				bar.setValue(100);
+				bar.setString("扫描完成！共处理 " + videoFiles.size() + " 个视频文件");
+			}
+
+			log.info("目录{}索引创建完成，共处理{}个视频文件", directory.getAbsolutePath(), videoFiles.size());
+
+		} catch (Exception e) {
+			log.error("创建目录索引失败", e);
+			if(bar!=null) {
+				bar.setString("扫描失败: " + e.getMessage());
+			}
+			throw new RuntimeException("创建目录索引失败: " + e.getMessage(), e);
+		}
+	}
+
+	/**
+	 * 递归收集目录下的所有视频文件
+	 * @param directory 要扫描的目录
+	 * @param result 结果列表
+	 * @param bar 进度条（可为null）
+	 */
+	private void collectVideoFiles(File directory, List<File> result, JProgressBar bar) {
+		if(!directory.exists() || !directory.isDirectory()) {
+			return;
+		}
+
+		File[] files = directory.listFiles();
+		if(files == null) {
+			return;
+		}
+
+		for(File file : files) {
+			if(file.isDirectory()) {
+				// 递归处理子目录
+				collectVideoFiles(file, result, bar);
+			} else if(FileUtils.isVideoFile(file)) {
+				result.add(file);
+			}
+		}
+	}
+
+
 }
