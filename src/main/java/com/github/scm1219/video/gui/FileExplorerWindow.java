@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
-import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -306,7 +305,6 @@ public class FileExplorerWindow extends JFrame {
         }
         
         final File targetFile = file;
-        final Boolean isBackOperation = isBack;
         
         SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
             @Override
