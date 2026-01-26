@@ -102,4 +102,19 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
 			log.error("打开文件夹失败："+dirPath, ex);
 		}
 	}
+
+	public static void openDirAndSelectFile(File file) {
+		if (file == null) {
+			log.warn("文件为空，无法打开");
+			return;
+		}
+		String filePath = file.getAbsolutePath();
+		try {
+			log.info("尝试调用系统命令打开文件夹并选中文件："+filePath);
+			ProcessBuilder processBuilder = new ProcessBuilder("explorer", "/select," + filePath);
+			processBuilder.start();
+		} catch (Exception ex) {
+			log.error("打开文件夹并选中文件失败："+filePath, ex);
+		}
+	}
 }

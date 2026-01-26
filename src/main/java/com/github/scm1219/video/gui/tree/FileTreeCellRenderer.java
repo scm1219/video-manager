@@ -17,17 +17,21 @@ public class FileTreeCellRenderer extends  DefaultTreeCellRenderer{
     public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
         FileTree fileTree = (FileTree) tree;
         FileTreeNode fileNode = (FileTreeNode) value;
-//        File file = (File) fileNode.getUserObject();
 
         JLabel label = (JLabel)super.getTreeCellRendererComponent(tree,value,selected,expanded,leaf,row,hasFocus);
-        label.setText(fileNode.getFileName());
+
+        String fileName = fileNode.getFileName();
+        if (fileNode.isIndexed()) {
+            label.setText("<html>" + fileName + " <font color='#00AA00'>[已索引]</font></html>");
+        } else {
+            label.setText("<html>" + fileName + " <font color='#999999'>[未索引]</font></html>");
+        }
 
         label.setIcon(fileNode.getFileIcon());
         label.setOpaque(false);
         if (fileTree.mouseInPath != null &&
                 fileTree.mouseInPath.getLastPathComponent().equals(value)) {
             label.setOpaque(true);
-//            label.setBackground(new Color(255, 0, 0, 90));
             label.setBackground(Color.gray);
         }
         return label;

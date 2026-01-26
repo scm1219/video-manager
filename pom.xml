@@ -13,8 +13,7 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<jdk.version>21</jdk.version>
-		<java.home>F:\tools\jdk-21</java.home>
+		<jdk.version>17</jdk.version>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -157,11 +156,9 @@
 							</singleInstance>
 							<icon>src/main/resources/0.ico</icon>
 							<jre>
-								<path>${java.home}</path>
 								<minVersion>${jdk.version}</minVersion>
 								<requires64Bit>true</requires64Bit>
-								<requiresJdk>true</requiresJdk>
-								<requiresJdk>preferJdk</requiresJdk>
+								<requiresJdk>false</requiresJdk>
 								<maxHeapSize>256</maxHeapSize>
 								<initialHeapSize>64</initialHeapSize>
 							</jre>
@@ -173,16 +170,16 @@
 								<productVersion>1.0.0.0</productVersion>
 								<txtProductVersion>1.0.0.0</txtProductVersion>
 								<productName>${project.name}</productName>
-								<companyName>springtour.com</companyName>
+								<companyName>springtour</companyName>
 								<internalName>video-manager</internalName>
 								<originalFilename>video-manager.exe</originalFilename>
 								<language>SIMPLIFIED_CHINESE</language>
 							</versionInfo>
 							<messages>
-								<startupErr>启动失败</startupErr>
-								<jreNotFoundErr>绑定JRE失败</jreNotFoundErr>
-								<jreVersionErr>Java版本错误</jreVersionErr>
-								<launcherErr>启动失败</launcherErr>
+								<startupErr>start error</startupErr>
+								<jreNotFoundErr>jre not found</jreNotFoundErr>
+								<jreVersionErr>java version error</jreVersionErr>
+								<launcherErr>launcher error</launcherErr>
 								<!-- Used by console header only. -->
 								<instanceAlreadyExistsMsg>实例已经启动</instanceAlreadyExistsMsg>
 							</messages>

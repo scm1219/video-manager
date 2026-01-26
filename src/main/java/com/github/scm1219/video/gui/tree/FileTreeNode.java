@@ -17,6 +17,7 @@ public class FileTreeNode extends DefaultMutableTreeNode {
     private boolean isDummyRoot;
     private String fileName;
     private Icon fileIcon;
+    private boolean isIndexed;
 
     public File getFile() {
         return file;
@@ -68,5 +69,13 @@ public class FileTreeNode extends DefaultMutableTreeNode {
 
     public void setFileIcon(Icon fileIcon) {
         this.fileIcon = fileIcon;
+    }
+
+    public boolean isIndexed() {
+        return isIndexed;
+    }
+
+    public void setIndexed(boolean indexed) {
+        isIndexed = indexed;
     }
 }

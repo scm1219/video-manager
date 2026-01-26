@@ -10,6 +10,8 @@ import java.awt.Toolkit;
 import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.KeyAdapter;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
@@ -72,22 +74,29 @@ public class FileExplorerWindow extends JFrame {
     private JButton btnSearchDir;
     private JButton btnRefresh;
     private JCheckBox chkVideoOnly;
+    private JCheckBox chkShowAllDisks;
     private JScrollPane spTable;
     private JScrollPane spIndexInfo;
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private JPopupMenu menu = new JPopupMenu();
     private boolean videoOnly = false;
+    private boolean showAllDisks = false;
 
     private void initData(){
         stackFile = new Stack<File>();
-        List<Disk> listDisk = DiskManager.getInstance().listDisk();
+        File[] rootDisks;
         
-        File[] rootDisks = new File[listDisk.size()];
+        if (showAllDisks) {
+            rootDisks = File.listRoots();
+        } else {
+            List<Disk> listDisk = DiskManager.getInstance().listDisk();
+            rootDisks = new File[listDisk.size()];
+            for (int i = 0; i < rootDisks.length; i++) {
+                rootDisks[i]=listDisk.get(i).getRoot();
+            }
+        }
         
         if(rootDisks.length>0) {
-        	for (int i = 0; i < rootDisks.length; i++) {
-    			rootDisks[i]=listDisk.get(i).getRoot();
-    		}
 	        fileTreeRoot = new FileTreeNode(rootDisks[0], true);
 	        
 	        File[] files = rootDisks;
@@ -95,6 +104,8 @@ public class FileExplorerWindow extends JFrame {
 	            if (files[i].isDirectory())
 	            {
 	                FileTreeNode childNode = new FileTreeNode(files[i], false);
+	                Disk disk = DiskManager.getInstance().findDisk(files[i]);
+	                childNode.setIndexed(disk != null && disk.needIndex());
 	                fileTreeRoot.add(childNode);
 	            }
 	        }
@@ -118,6 +129,7 @@ public class FileExplorerWindow extends JFrame {
         btnSearchDir = new JButton("搜索文件夹");
         btnRefresh = new JButton("刷新磁盘");
         chkVideoOnly = new JCheckBox("只显示视频文件");
+        chkShowAllDisks = new JCheckBox("显示所有磁盘");
         JMenuItem mEchoIndexInfo;
 		mEchoIndexInfo = new JMenuItem("打开所在文件夹");
 		menu.add(mEchoIndexInfo);
@@ -128,13 +140,12 @@ public class FileExplorerWindow extends JFrame {
 				FileTable fileTable = (FileTable)menu.getInvoker();
 				int row =fileTable.getSelectedRow();
                 File file = (File) fileTable.getValueAt(row, 0);
-                File parentDir = file.getParentFile();
-                String dirPath = parentDir.getAbsolutePath();
-                if (ClickDebouncer.shouldOpen(dirPath)) {
+                String filePath = file.getAbsolutePath();
+                if (ClickDebouncer.shouldOpen(filePath)) {
                     try {
-                        FileUtils.openDir(parentDir);
+                        FileUtils.openDirAndSelectFile(file);
                     } catch (Exception ex) {
-                        ClickDebouncer.recordError(dirPath);
+                        ClickDebouncer.recordError(filePath);
                     }
                 }
 			}
@@ -243,10 +254,10 @@ public class FileExplorerWindow extends JFrame {
     	pnlIndexInfo.repaint();
     }
 
-    private void refreshTree() {
+    private void refreshTree(boolean showPrompt) {
     	DiskManager.getInstance().reloadDisks();
     	initData();
-    	
+
     	DefaultTreeModel dfTreeModel = new DefaultTreeModel(fileTreeRoot) {
 			private static final long serialVersionUID = 1L;
 
@@ -265,14 +276,16 @@ public class FileExplorerWindow extends JFrame {
         if (trFileTree.getRowCount() > 0) {
         	trFileTree.setSelectionRow(0);
         }
-        
+
         updateIndexInfo();
-        
-        List<Disk> disks = DiskManager.getInstance().listDisk();
-        if(disks.size()<1) {
-        	JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "提示", MessageType.INFO.ordinal());
-        } else {
-        	JOptionPane.showMessageDialog(null, "刷新成功，共发现 "+disks.size()+" 个需要索引的磁盘", "提示", MessageType.INFO.ordinal());
+
+        if (showPrompt) {
+        	List<Disk> disks = DiskManager.getInstance().listDisk();
+        	if(disks.size()<1) {
+        		JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "提示", MessageType.INFO.ordinal());
+        	} else {
+        		JOptionPane.showMessageDialog(null, "刷新成功，共发现 "+disks.size()+" 个需要索引的磁盘", "提示", MessageType.INFO.ordinal());
+        	}
         }
     }
     
@@ -342,6 +355,7 @@ public class FileExplorerWindow extends JFrame {
                 	}
                 }
                 if(e.getButton() == MouseEvent.BUTTON3) {
+                	fileTable.setRowSelectionInterval(row, row);
                 	menu.show(tbFile, e.getX(), e.getY());
                 }
             }
@@ -375,6 +389,19 @@ public class FileExplorerWindow extends JFrame {
 				}
 			}
 		});
+        
+        tfSearch.addKeyListener(new KeyAdapter() {
+			@Override
+			public void keyPressed(KeyEvent e) {
+				if (e.getKeyCode() == KeyEvent.VK_ENTER) {
+					String test = tfSearch.getText();
+					if(StringUtils.isNotBlank(test)) {
+						List<File> files = DiskManager.getInstance().searchAllFiles(test);
+						updateSearchResult(files);
+					}
+				}
+			}
+		});
 
         btnSearchDir.addActionListener(new ActionListener() {
 			
@@ -398,10 +425,18 @@ public class FileExplorerWindow extends JFrame {
             }
         });
 
+        chkShowAllDisks.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                showAllDisks = chkShowAllDisks.isSelected();
+                refreshTree(false);
+            }
+        });
+
         btnRefresh.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                refreshTree();
+                refreshTree(true);
             }
         });
     }
@@ -445,9 +480,16 @@ public class FileExplorerWindow extends JFrame {
         spLeft.setTopComponent(scroll);
         spLeft.setBottomComponent(spIndexInfo);
         spLeft.setResizeWeight(0.8);
-        
+
+        JPanel pnlLeftTop = new JPanel();
+        pnlLeftTop.setLayout(new GridBagLayout());
+        pnlLeftTop.add(chkShowAllDisks, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
+                GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
+
         pnlLeft.setLayout(new GridBagLayout());
-        pnlLeft.add(spLeft, new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
+        pnlLeft.add(pnlLeftTop, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.0, GridBagConstraints.EAST,
+                GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
+        pnlLeft.add(spLeft, new GridBagConstraints(0, 1, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
         pnlRight.setLayout(new GridBagLayout());

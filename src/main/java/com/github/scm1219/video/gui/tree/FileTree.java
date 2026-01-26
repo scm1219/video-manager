@@ -7,6 +7,7 @@ import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.io.IOException;
 
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
@@ -31,17 +32,29 @@ public class FileTree extends JTree {
 	private void initPopMenu() {
 		FileTree parent = this;
 
-		JMenuItem mEchoIndexInfo, mCreateIndex,mShowSmart;
+		JMenuItem mEchoIndexInfo, mCreateIndex,mShowSmart,mCreateNeedIndexFile;
 		mEchoIndexInfo = new JMenuItem("查看索引信息");
 		menu.add(mEchoIndexInfo);
 		mCreateIndex = new JMenuItem("更新索引");
 		menu.add(mCreateIndex);
 		mShowSmart = new JMenuItem("磁盘健康状况");
 		menu.add(mShowSmart);
+		mCreateNeedIndexFile = new JMenuItem("创建needindex文件");
+		menu.add(mCreateNeedIndexFile);
 		this.addMouseListener(new MouseAdapter() {
 			public void mouseClicked(MouseEvent e) {
 				if (e.getButton() == MouseEvent.BUTTON3) {
 					if(mouseInPath!=null) {
+						FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
+						File file = fileTreeNode.getFile();
+						Disk disk = DiskManager.getInstance().findDisk(file);
+						boolean isIndexed = fileTreeNode.isIndexed();
+
+						mEchoIndexInfo.setEnabled(isIndexed && disk != null && disk.getIndex().exists());
+						mCreateIndex.setEnabled(isIndexed && disk != null);
+						mCreateNeedIndexFile.setEnabled(!isIndexed);
+						mShowSmart.setEnabled(true);
+
 						menu.show(parent, e.getX(), e.getY());
 					}
 				}
@@ -108,6 +121,34 @@ public class FileTree extends JTree {
 			}
 		});
 
+		mCreateNeedIndexFile.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				if(mouseInPath!=null) {
+					FileTreeNode fileTreeNode =(FileTreeNode)mouseInPath.getLastPathComponent();
+					File file = fileTreeNode.getFile();
+					try {
+						File flagFile = new File(file.getPath() + Disk.FLAF_FILE);
+						if (flagFile.exists()) {
+							JOptionPane.showMessageDialog(null, "needindex文件已存在");
+						} else {
+						flagFile.createNewFile();
+						JOptionPane.showMessageDialog(null, "needindex文件创建成功");
+						DiskManager.getInstance().loadDisks();
+						Disk disk = DiskManager.getInstance().findDisk(file);
+						if (disk != null) {
+							disk.initEmptyDatabase();
+						}
+						fileTreeNode.setIndexed(true);
+						repaint();
+					}
+					} catch (IOException ex) {
+						JOptionPane.showMessageDialog(null, "创建needindex文件失败: " + ex.getMessage());
+					}
+				}
+			}
+		});
+
 	}
 
 	static protected FileSystemView fileSystemView = FileSystemView.getFileSystemView();
@@ -150,15 +191,24 @@ public class FileTree extends JTree {
 				if (path != null) {
 					if (mouseInPath != null) {
 						Rectangle oldRect = getPathBounds(mouseInPath);
+						Rectangle newRect = getPathBounds(path);
 						mouseInPath = path;
-						repaint(getPathBounds(path).union(oldRect));
+						if (oldRect != null && newRect != null) {
+							repaint(newRect.union(oldRect));
+						} else if (oldRect != null) {
+							repaint(oldRect);
+						} else if (newRect != null) {
+							repaint(newRect);
+						}
 					} else {
 						mouseInPath = path;
 					}
 				} else if (mouseInPath != null) {
 					Rectangle oldRect = getPathBounds(mouseInPath);
 					mouseInPath = null;
-					repaint(oldRect);
+					if (oldRect != null) {
+						repaint(oldRect);
+					}
 				}
 			}
 		});

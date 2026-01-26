@@ -44,17 +44,19 @@ public class DiskManager {
 		File[] f = File.listRoots();
 		for (int i = 0; i < f.length; i++) {
 			Disk disk = new Disk(f[i]);
-			if(disk.needIndex() && !disks.contains(disk) ) {
-				disks.add(disk);
+			if(disk.needIndex()) {
+				if (!disks.contains(disk)) {
+					disks.add(disk);
+				}
 			}else {
 				log.info("因未发现"+Disk.FLAF_FILE+"文件，忽略磁盘"+disk.getPath());
 			}
 		}
-		
+
 		Collections.sort(disks, new Comparator<Disk>() {
         	@Override
         	public int compare(Disk o1, Disk o2) {
-        		
+
         		String displayName1  =fileSystemView.getSystemDisplayName(o1.getRoot());
         		String dispalyName2 = fileSystemView.getSystemDisplayName(o2.getRoot());
         		return displayName1.compareTo(dispalyName2);

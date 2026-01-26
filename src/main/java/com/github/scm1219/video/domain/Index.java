@@ -200,6 +200,20 @@ public class Index {
 		return exists;
 	}
 
+	public void initEmptyTables() {
+		try(Connection connection=getConnection()) {
+			connection.setAutoCommit(true);
+			try(Statement stmt = connection.createStatement()){
+				stmt.executeUpdate("create table files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
+				stmt.executeUpdate("create index idx_filename on files (fileName)");
+				stmt.executeUpdate("create index idx_dirname on files (dirName)");
+				stmt.executeQuery("select count(*) from files");
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
 	public String getInfoString() {
 		StringBuilder sb = new StringBuilder();
 		sb.append("位置："+indexFile.getParent());

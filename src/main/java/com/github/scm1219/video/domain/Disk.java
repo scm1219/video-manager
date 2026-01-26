@@ -8,9 +8,11 @@ import javax.swing.JProgressBar;
 
 import com.github.scm1219.utils.FileUtils;
 
+import lombok.EqualsAndHashCode;
 import lombok.ToString;
 
 @ToString
+@EqualsAndHashCode
 public class Disk {
 
 	public static final String FLAF_FILE=".disk.needindex";
@@ -106,5 +108,9 @@ public class Disk {
 		List<File> result = new ArrayList<>();
 		findVideoDir(base, result,bar,true);
 		return result;
+	}
+
+	public void initEmptyDatabase() {
+		index.initEmptyTables();
 	}
 }
