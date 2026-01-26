@@ -21,10 +21,15 @@ public class FileTreeCellRenderer extends  DefaultTreeCellRenderer{
         JLabel label = (JLabel)super.getTreeCellRendererComponent(tree,value,selected,expanded,leaf,row,hasFocus);
 
         String fileName = fileNode.getFileName();
-        if (fileNode.isIndexed()) {
-            label.setText("<html>" + fileName + " <font color='#00AA00'>[已索引]</font></html>");
+        boolean isDiskRoot = fileNode.getFile().getParent() == null;
+        if (isDiskRoot) {
+            if (fileNode.isIndexed()) {
+                label.setText("<html>" + fileName + " <font color='#00AA00'>[已索引]</font></html>");
+            } else {
+                label.setText("<html>" + fileName + " <font color='#999999'>[未索引]</font></html>");
+            }
         } else {
-            label.setText("<html>" + fileName + " <font color='#999999'>[未索引]</font></html>");
+            label.setText(fileName);
         }
 
         label.setIcon(fileNode.getFileIcon());
