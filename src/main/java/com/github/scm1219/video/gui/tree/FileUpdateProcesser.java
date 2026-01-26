@@ -17,6 +17,7 @@ import javax.swing.SwingConstants;
 import javax.swing.WindowConstants;
 
 import com.github.scm1219.video.domain.Disk;
+import com.github.scm1219.video.domain.Index.IndexStatistics;
 
 
 public class FileUpdateProcesser extends JFrame {
@@ -156,7 +157,13 @@ public class FileUpdateProcesser extends JFrame {
 				disk.getIndex().create(disk,bar);
 			} else {
 				// 目录级索引
-				disk.getIndex().createForDirectory(targetDirectory, bar);
+				IndexStatistics stats = disk.getIndex().createForDirectory(targetDirectory, bar);
+				long t2 = System.currentTimeMillis();
+				bar.setString("扫描完成，耗时："+(t2-t1)+"ms\n");
+				textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n" +
+							   "状态: 扫描完成\n" +
+							   stats.toFormattedString() +
+							   "总耗时: " + (t2-t1) + "ms");
 			}
 
 			long t2 = System.currentTimeMillis();
@@ -164,11 +171,6 @@ public class FileUpdateProcesser extends JFrame {
 			if(targetDirectory == null) {
 				bar.setString("索引创建完成，耗时："+(t2-t1)+"ms\n");
 				textArea.setText(disk.getIndex().getInfoString());
-			} else {
-				bar.setString("扫描完成，耗时："+(t2-t1)+"ms\n");
-				textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n" +
-							   "状态: 扫描完成\n" +
-							   "耗时: " + (t2-t1) + "ms");
 			}
 
 			button.setText("关闭");

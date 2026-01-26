@@ -30,12 +30,82 @@ import lombok.extern.slf4j.Slf4j;
 @ToString
 public class Index {
 
-	
+
 	private File indexFile;
-	
+
 	private boolean exists =false;
-	
+
 	boolean isIndexing=false;
+
+	/**
+	 * 索引统计信息
+	 */
+	public static class IndexStatistics {
+		private int totalCount;      // 扫描文件总数
+		private int addedCount;      // 新增文件数
+		private int deletedCount;    // 删除记录数
+		private long scanTime;       // 扫描耗时(ms)
+
+		public IndexStatistics() {
+		}
+
+		public IndexStatistics(int totalCount, int addedCount, int deletedCount, long scanTime) {
+			this.totalCount = totalCount;
+			this.addedCount = addedCount;
+			this.deletedCount = deletedCount;
+			this.scanTime = scanTime;
+		}
+
+		public int getTotalCount() {
+			return totalCount;
+		}
+
+		public void setTotalCount(int totalCount) {
+			this.totalCount = totalCount;
+		}
+
+		public int getAddedCount() {
+			return addedCount;
+		}
+
+		public void setAddedCount(int addedCount) {
+			this.addedCount = addedCount;
+		}
+
+		public int getDeletedCount() {
+			return deletedCount;
+		}
+
+		public void setDeletedCount(int deletedCount) {
+			this.deletedCount = deletedCount;
+		}
+
+		public long getScanTime() {
+			return scanTime;
+		}
+
+		public void setScanTime(long scanTime) {
+			this.scanTime = scanTime;
+		}
+
+		/**
+		 * 格式化输出用于UI显示
+		 * @return 格式化的统计信息字符串
+		 */
+		public String toFormattedString() {
+			StringBuilder sb = new StringBuilder();
+			sb.append("扫描文件总数: ").append(totalCount).append("\n");
+			sb.append("新增文件数: ").append(addedCount).append("\n");
+			sb.append("删除旧记录: ").append(deletedCount).append("\n");
+			return sb.toString();
+		}
+
+		@Override
+		public String toString() {
+			return String.format("IndexStatistics{total=%d, added=%d, deleted=%d, time=%dms}",
+					totalCount, addedCount, deletedCount, scanTime);
+		}
+	}
 	
 	public Index(File indexFile) {
 		this.indexFile = indexFile;
@@ -249,8 +319,11 @@ public class Index {
 	 * 为指定目录创建索引（先删除旧记录，再扫描并插入新记录）
 	 * @param directory 要扫描的目录
 	 * @param bar 进度条（可为null）
+	 * @return 索引统计信息
 	 */
-	public void createForDirectory(File directory, JProgressBar bar) {
+	public IndexStatistics createForDirectory(File directory, JProgressBar bar) {
+		long startTime = System.currentTimeMillis();
+		IndexStatistics stats = new IndexStatistics();
 		if(bar!=null) {
 			bar.setString("开始扫描目录: " + directory.getName());
 		}
@@ -274,6 +347,18 @@ public class Index {
 			if(bar!=null) {
 				bar.setString("删除旧索引记录...");
 			}
+
+			// 统计删除前的记录数
+			int deletedCount = 0;
+			try(Statement stmt = connection.createStatement()) {
+				String countSql = "SELECT COUNT(*) FROM files WHERE dirPath LIKE '" + dirPath + "%'";
+				log.debug("执行统计SQL: {}", countSql);
+				ResultSet rs = stmt.executeQuery(countSql);
+				if(rs.next()) {
+					deletedCount = rs.getInt(1);
+				}
+			}
+			stats.setDeletedCount(deletedCount);
 
 			// 删除该目录下的所有旧记录
 			try(Statement stmt = connection.createStatement()) {
@@ -348,6 +433,11 @@ public class Index {
 				bar.setString("扫描完成！共处理 " + videoFiles.size() + " 个视频文件");
 			}
 
+			// 设置统计信息
+			stats.setTotalCount(videoFiles.size());
+			stats.setAddedCount(videoFiles.size());
+			stats.setScanTime(System.currentTimeMillis() - startTime);
+
 			log.info("目录{}索引创建完成，共处理{}个视频文件", directory.getAbsolutePath(), videoFiles.size());
 
 		} catch (Exception e) {
@@ -355,8 +445,12 @@ public class Index {
 			if(bar!=null) {
 				bar.setString("扫描失败: " + e.getMessage());
 			}
+			// 即使失败也返回已收集的统计信息
+			stats.setScanTime(System.currentTimeMillis() - startTime);
 			throw new RuntimeException("创建目录索引失败: " + e.getMessage(), e);
 		}
+
+		return stats;
 	}
 
 	/**
