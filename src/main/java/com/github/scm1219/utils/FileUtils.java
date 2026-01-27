@@ -82,6 +82,9 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
 		try {
 			log.info("尝试调用系统命令打开文件："+filePath);
 			ProcessBuilder processBuilder = new ProcessBuilder("rundll32", "url.dll", "FileProtocolHandler", filePath);
+			// 重定向输出流，避免创建 nul 文件
+			processBuilder.redirectError(ProcessBuilder.Redirect.DISCARD);
+			processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
 			processBuilder.start();
 		} catch (Exception ex) {
 			log.error("打开文件失败："+filePath, ex);
@@ -97,6 +100,9 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
 		try {
 			log.info("尝试调用系统命令打开文件夹："+dirPath);
 			ProcessBuilder processBuilder = new ProcessBuilder("rundll32", "url.dll", "FileProtocolHandler", dirPath);
+			// 重定向输出流，避免创建 nul 文件
+			processBuilder.redirectError(ProcessBuilder.Redirect.DISCARD);
+			processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
 			processBuilder.start();
 		} catch (Exception ex) {
 			log.error("打开文件夹失败："+dirPath, ex);
@@ -108,10 +114,19 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
 			log.warn("文件为空，无法打开");
 			return;
 		}
+		if(!file.exists()) {
+			log.warn("文件不存在，无法打开");
+			return;
+		}
 		String filePath = file.getAbsolutePath();
 		try {
-			log.info("尝试调用系统命令打开文件夹并选中文件："+filePath);
-			ProcessBuilder processBuilder = new ProcessBuilder("explorer", "/select," + filePath);
+			log.info("尝试调用系统命令打开文件夹并选中文件（cmd 单参数方式）："+filePath);
+			// 使用 cmd /c 将整个命令作为单个参数传递，避免特殊字符解析问题
+			String command = "explorer /select,\"" + filePath + "\"";
+			ProcessBuilder processBuilder = new ProcessBuilder("cmd", "/c", command);
+			// 重定向输出流，避免创建 nul 文件
+			processBuilder.redirectError(ProcessBuilder.Redirect.DISCARD);
+			processBuilder.redirectOutput(ProcessBuilder.Redirect.DISCARD);
 			processBuilder.start();
 		} catch (Exception ex) {
 			log.error("打开文件夹并选中文件失败："+filePath, ex);

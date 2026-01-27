@@ -77,7 +77,7 @@ mvn clean package
 
 ## 技术栈
 
-- **Java**: 21
+- **Java**: 17
 - **构建工具**: Maven
 - **数据库**: SQLite (sqlite-jdbc 3.51.1.0)
 - **GUI 框架**: Java Swing

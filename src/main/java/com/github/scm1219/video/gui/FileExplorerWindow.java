@@ -81,8 +81,10 @@ public class FileExplorerWindow extends JFrame {
     private JScrollPane spIndexInfo;
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private JPopupMenu menu = new JPopupMenu();
+    private JMenuItem mNavigateTo;
     private boolean videoOnly = false;
     private boolean showAllDisks = false;
+    private boolean isSearchMode = false;
 
     private void initData(){
         stackFile = new Stack<File>();
@@ -122,6 +124,7 @@ public class FileExplorerWindow extends JFrame {
         spBottom = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
         spLeft = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
         tfDir = new JTextField();
+        tfDir.setEditable(false);
         tfSearch =  new JTextField();
         trFileTree = new FileTree();
         tbFile = new FileTable();
@@ -202,6 +205,30 @@ public class FileExplorerWindow extends JFrame {
                 }).start();
 			}
 		});
+
+		// 新增：转到菜单项
+		mNavigateTo = new JMenuItem("转到");
+		menu.add(mNavigateTo);
+		mNavigateTo.addActionListener(new ActionListener() {
+
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				FileTable fileTable = (FileTable)menu.getInvoker();
+				int row = fileTable.getSelectedRow();
+                File file = (File) fileTable.getValueAt(row, 0);
+
+                // 检测文件存在性
+                if (canNavigateToFile(file)) {
+                    File parentDir = file.getParentFile();
+                    updateTable(parentDir, false);
+                } else {
+                    JOptionPane.showMessageDialog(FileExplorerWindow.this,
+                        file == null || !file.exists() ? "文件不存在" : "父目录不存在或无法访问",
+                        "错误",
+                        JOptionPane.ERROR_MESSAGE);
+                }
+			}
+		});
     }
 
     public static final Comparator<File> FILE_COMPARATOR= new Comparator<File>() {
@@ -235,6 +262,7 @@ public class FileExplorerWindow extends JFrame {
      * @param files
      */
     private void updateSearchResult(List<File> files) {
+    	isSearchMode = true;
     	File[] fileArray = new File[files.size()];
     	files.toArray(fileArray);
     	setFileTable(fileArray);
@@ -242,9 +270,18 @@ public class FileExplorerWindow extends JFrame {
     
     /**
      * 设置表格里的数据
-     * @param files
+     * @param files 文件数组
      */
     private void setFileTable(File[] files) {
+        setFileTable(files, false);
+    }
+
+    /**
+     * 设置表格里的数据
+     * @param files 文件数组
+     * @param showParentRow 是否显示"返回上一级"虚拟行
+     */
+    private void setFileTable(File[] files, boolean showParentRow) {
     	List<File> fileList = new java.util.ArrayList<File>();
         for (int i = 0; i < files.length; i++){
             if (videoOnly) {
@@ -263,7 +300,8 @@ public class FileExplorerWindow extends JFrame {
             }
         }
 
-        FileTableModel model = new FileTableModel(fileData);
+        FileTableModel model = new FileTableModel(fileData, showParentRow);
+//        model.setCheckFileExists(isSearchMode);
         tbFile.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
         sort.setComparator(0, FILE_COMPARATOR);
@@ -385,7 +423,50 @@ public class FileExplorerWindow extends JFrame {
     	}
     }
 
+    /**
+     * 判断指定文件是否为磁盘根目录
+     * @param file 文件对象
+     * @return 如果是磁盘根目录返回 true
+     */
+    private boolean isDiskRoot(File file) {
+        if (file == null || !file.isDirectory()) {
+            return false;
+        }
+
+        // 检查是否为 File.listRoots() 中的根目录
+        File[] roots = File.listRoots();
+        for (File root : roots) {
+            if (file.equals(root)) {
+                return true;
+            }
+        }
+
+        // 检查是否为索引磁盘列表中的根目录
+        List<Disk> disks = DiskManager.getInstance().listDisk();
+        for (Disk disk : disks) {
+            if (file.equals(disk.getRoot())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 验证文件是否可以跳转到其父目录
+     * @param file 要验证的文件
+     * @return true 可以跳转，false 不可以
+     */
+    private boolean canNavigateToFile(File file) {
+        if (file == null || !file.exists()) {
+            return false;
+        }
+        File parentDir = file.getParentFile();
+        return parentDir != null && parentDir.exists();
+    }
+
     private void updateTable(File file, Boolean isBack){
+        isSearchMode = false;
         String path = file.getAbsolutePath();
         if (path == null)
             return;
@@ -394,7 +475,7 @@ public class FileExplorerWindow extends JFrame {
         if (!isBack){
             stackFile.push(file);
         }
-        
+
         final File targetFile = file;
         
         SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
@@ -407,7 +488,9 @@ public class FileExplorerWindow extends JFrame {
             protected void done() {
                 try {
                     File[] files = get();
-                    setFileTable(files);
+                    // 判断是否在磁盘根目录
+                    boolean isRootDirectory = isDiskRoot(targetFile);
+                    setFileTable(files, !isRootDirectory);
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
@@ -449,6 +532,20 @@ public class FileExplorerWindow extends JFrame {
             public void mouseClicked(MouseEvent e) {
                 FileTable fileTable = (FileTable)e.getSource();
                 int row = fileTable.rowAtPoint(e.getPoint());
+
+                // 检查是否点击虚拟行
+                FileTableModel model = fileTable.getFileTableModel();
+                if (model != null && model.isParentRow(row)) {
+                    // 双击虚拟行触发返回上级
+                    if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
+                        if (stackFile.size() > 1) {
+                            stackFile.pop();
+                            updateTable(stackFile.peek(), true);
+                        }
+                    }
+                    return;
+                }
+
                 File file = (File) fileTable.getValueAt(row, 0);
                 if (e.getClickCount() == 1){
 //                	TreePath path =trFileTree.getSelectionPath();
@@ -470,6 +567,10 @@ public class FileExplorerWindow extends JFrame {
                 }
                 if(e.getButton() == MouseEvent.BUTTON3) {
                 	fileTable.setRowSelectionInterval(row, row);
+
+                	// 动态控制"转到"菜单项状态
+                	mNavigateTo.setEnabled(isSearchMode && canNavigateToFile(file));
+
                 	menu.show(tbFile, e.getX(), e.getY());
                 }
             }

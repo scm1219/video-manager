@@ -145,7 +145,7 @@
 							<headerType>gui</headerType>
 							<jar>${project.build.directory}/${project.artifactId}-${project.version}-shaded.jar</jar>
 							<outfile>${project.build.directory}/video-manager.exe</outfile>
-							<downloadUrl>http://java.com/download</downloadUrl>
+							<downloadUrl>https://www.oracle.com/java/technologies/downloads/#java17</downloadUrl>
 							<classPath>
 								<mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>
 								<preCp>anything</preCp>
