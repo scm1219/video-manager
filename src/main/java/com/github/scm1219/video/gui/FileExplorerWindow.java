@@ -25,6 +25,8 @@ import javax.swing.SwingWorker;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -229,6 +231,63 @@ public class FileExplorerWindow extends JFrame {
                 }
 			}
 		});
+
+		// 创建菜单栏和主题菜单
+		createMenuBar();
+    }
+
+    /**
+     * 创建菜单栏和主题菜单
+     */
+    private void createMenuBar() {
+    	JMenuBar menuBar = new JMenuBar();
+
+    	// 创建主题菜单
+    	JMenu themeMenu = new JMenu("主题");
+
+    	// 定义主题配置：显示名称 + 主题代码
+    	String[][] themeConfigs = {
+    		{"浅色主题", ThemeManager.THEME_LIGHT},
+    		{"深色主题", ThemeManager.THEME_DARK},
+    		{"跟随系统", ThemeManager.THEME_AUTO}
+    	};
+
+    	// 循环创建菜单项
+    	for (String[] config : themeConfigs) {
+    		JMenuItem item = new JMenuItem(config[0]);
+    		final String themeCode = config[1]; // 使用 final 变量供 lambda 使用
+    		item.addActionListener(e -> switchTheme(themeCode));
+    		themeMenu.add(item);
+    	}
+
+    	// 将主题菜单添加到菜单栏
+    	menuBar.add(themeMenu);
+
+    	// 设置窗口的菜单栏
+    	this.setJMenuBar(menuBar);
+    }
+
+    /**
+     * 切换主题
+     * @param themeName 主题名称（light/dark/auto）
+     */
+    private void switchTheme(String themeName) {
+    	boolean success = ThemeManager.getInstance().applyTheme(themeName);
+    	if (success) {
+    		// 刷新所有组件的 UI
+    		ThemeManager.updateUI();
+    		// 显示切换成功提示
+    		JOptionPane.showMessageDialog(this,
+    			"已切换到" + ThemeManager.getThemeDisplayName(themeName),
+    			"主题切换",
+    			JOptionPane.INFORMATION_MESSAGE);
+    	} else {
+    		// 显示切换失败提示
+    		JOptionPane.showMessageDialog(this,
+    			"主题切换失败，请查看控制台日志",
+    			"错误",
+    			JOptionPane.ERROR_MESSAGE);
+    	}
     }
 
     public static final Comparator<File> FILE_COMPARATOR= new Comparator<File>() {

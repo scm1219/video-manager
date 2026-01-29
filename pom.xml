@@ -34,12 +34,12 @@
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-classic</artifactId>
-			<version>1.5.25</version>
+			<version>1.5.26</version>
 		</dependency>
 		<dependency>
 			<groupId>ch.qos.logback</groupId>
 			<artifactId>logback-core</artifactId>
-			<version>1.5.25</version>
+			<version>1.5.26</version>
 		</dependency>
 		<dependency>
 			<groupId>org.projectlombok</groupId>
@@ -56,6 +56,11 @@
 			<groupId>commons-io</groupId>
 			<artifactId>commons-io</artifactId>
 			<version>2.21.0</version>
+		</dependency>
+		<dependency>
+			<groupId>com.formdev</groupId>
+			<artifactId>flatlaf</artifactId>
+			<version>3.7</version>
 		</dependency>
 	</dependencies>
 	<build>
@@ -166,7 +171,7 @@
 								<fileVersion>1.0.0.0</fileVersion>
 								<txtFileVersion>${project.version}</txtFileVersion>
 								<fileDescription>${project.name}</fileDescription>
-								<copyright>2022 springtour.cn</copyright>
+								<copyright>2025 scm1219@github.com</copyright>
 								<productVersion>1.0.0.0</productVersion>
 								<txtProductVersion>1.0.0.0</txtProductVersion>
 								<productName>${project.name}</productName>

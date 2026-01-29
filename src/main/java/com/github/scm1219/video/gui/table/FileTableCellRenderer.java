@@ -10,6 +10,7 @@ import javax.swing.JTable;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.TableCellRenderer;
 
+import com.formdev.flatlaf.FlatLaf;
 import com.github.scm1219.utils.DateUtils;
 import com.github.scm1219.utils.FileUtils;
 import com.github.scm1219.video.gui.IconCache;
@@ -17,6 +18,14 @@ import com.github.scm1219.video.gui.IconCache;
 public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
 	private static final long serialVersionUID = 1L;
 	FileSystemView fileSystemView = FileSystemView.getFileSystemView();
+
+	// 浅色主题配色方案
+	private static final Color PARENT_ROW_BG_LIGHT = new Color(220, 235, 255);
+	private static final Color PARENT_ROW_FG_LIGHT = new Color(0, 51, 153);
+
+	// 深色主题配色方案
+	private static final Color PARENT_ROW_BG_DARK = new Color(60, 70, 90);
+	private static final Color PARENT_ROW_FG_DARK = new Color(150, 180, 220);
 
 	@Override
     public Component getTableCellRendererComponent(JTable table, Object value, boolean isSelected, boolean hasFocus, int row, int column) {
@@ -39,9 +48,15 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
         }
         else {
             if (isParentRow) {
-                // 虚拟行使用浅蓝色背景
-                this.setBackground(new Color(220, 235, 255));
-                this.setForeground(new Color(0, 51, 153));
+                // 虚拟行根据主题使用不同的配色
+                boolean isDark = FlatLaf.isLafDark();
+                if (isDark) {
+                    this.setBackground(PARENT_ROW_BG_DARK);
+                    this.setForeground(PARENT_ROW_FG_DARK);
+                } else {
+                    this.setBackground(PARENT_ROW_BG_LIGHT);
+                    this.setForeground(PARENT_ROW_FG_LIGHT);
+                }
             } else {
                 // 检测文件是否存在，不存在则显示红色
                 if (model != null && !model.fileExists(row)) {
