@@ -5,6 +5,7 @@ import java.awt.Toolkit;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import com.github.scm1219.video.domain.DiskManager;
@@ -30,6 +31,16 @@ public class VideoManagerApp {
 		}
 		
 		frame.setVisible(true);
+
+		// 在窗口完全显示后，激活搜索框焦点
+		SwingUtilities.invokeLater(new Runnable() {
+			@Override
+			public void run() {
+				if (frame instanceof FileExplorerWindow) {
+					((FileExplorerWindow) frame).focusSearchField();
+				}
+			}
+		});
 
     }
     /**

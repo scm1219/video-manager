@@ -3,6 +3,7 @@ package com.github.scm1219.video.gui;
 import java.awt.Color;
 import java.awt.Container;
 import java.awt.Dimension;
+import java.awt.Point;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
@@ -36,6 +37,11 @@ import javax.swing.JSplitPane;
 import javax.swing.JTextField;
 import javax.swing.JTree;
 import javax.swing.ScrollPaneLayout;
+import javax.swing.ActionMap;
+import javax.swing.InputMap;
+import javax.swing.AbstractAction;
+import javax.swing.JComponent;
+import javax.swing.KeyStroke;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileSystemView;
@@ -325,6 +331,8 @@ public class FileExplorerWindow extends JFrame {
     	File[] fileArray = new File[files.size()];
     	files.toArray(fileArray);
     	setFileTable(fileArray);
+    	// 搜索后滚动条回到顶部
+    	spTable.getViewport().setViewPosition(new Point(0, 0));
     }
     
     /**
@@ -809,10 +817,59 @@ public class FileExplorerWindow extends JFrame {
                 GridBagConstraints.BOTH, new Insets(4, 2, 2, 2), 0, 0));
         
         updateIndexInfo();
-        
+
+        // 设置搜索框快捷键
+        setupSearchShortcuts();
+
         Dimension screenSize = Toolkit.getDefaultToolkit().getScreenSize();
         this.setBounds(screenSize.width/2 - width/2, screenSize.height/2 - height/2, width, height);
         this.setMinimumSize(new Dimension(width, height));
+    }
+
+    /**
+     * 设置搜索框的快捷键
+     * - Ctrl+F: 定位搜索框并选中全部文本
+     * - Alt+W: 清空搜索内容并刷新表格（回到当前目录）
+     */
+    private void setupSearchShortcuts() {
+        // 获取输入映射和动作映射
+        InputMap inputMap = tfSearch.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = tfSearch.getActionMap();
+
+        // 注册 Ctrl+F: 定位搜索框并选中全部文本
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, KeyEvent.CTRL_DOWN_MASK), "focusSearch");
+        actionMap.put("focusSearch", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                tfSearch.requestFocusInWindow();
+                tfSearch.selectAll();
+            }
+        });
+
+        // 注册 Alt+W: 清空搜索内容并刷新表格（与"清空搜索"按钮逻辑一致）
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_W, KeyEvent.ALT_DOWN_MASK), "clearSearch");
+        actionMap.put("clearSearch", new AbstractAction() {
+            private static final long serialVersionUID = 1L;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                tfSearch.setText("");
+                if(currentDir!=null) {
+                    updateTable(currentDir,false);
+                }
+                tfSearch.requestFocusInWindow();  // 保持焦点在搜索框
+            }
+        });
+    }
+
+    /**
+     * 激活搜索框焦点（供外部调用）
+     * 用于窗口初始化后将焦点定位到搜索框
+     */
+    public void focusSearchField() {
+        tfSearch.requestFocusInWindow();
     }
 
     private int width=1024;

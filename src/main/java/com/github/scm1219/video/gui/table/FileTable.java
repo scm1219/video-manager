@@ -24,8 +24,10 @@ public class FileTable extends JTable {
         super.setModel(dataModel);
         if (dataModel instanceof FileTableModel) {
             fileTableModel = (FileTableModel) dataModel;
-            // 为虚拟行设置固定高度
-            setRowHeight(0, 30);
+            // 为虚拟行设置固定高度（仅当表格有数据时）
+            if (getRowCount() > 0) {
+                setRowHeight(0, 30);
+            }
         }
     }
 
