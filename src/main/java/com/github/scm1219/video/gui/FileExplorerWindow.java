@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Stack;
 import javax.swing.SwingWorker;
+import javax.swing.Timer;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JFrame;
@@ -42,6 +43,8 @@ import javax.swing.InputMap;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
+import javax.swing.event.DocumentListener;
+import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
 import javax.swing.filechooser.FileSystemView;
@@ -74,6 +77,8 @@ public class FileExplorerWindow extends JFrame {
     private JSplitPane spLeft;
     private JTextField tfDir;
     private JTextField tfSearch;
+    private JCheckBox chkRealtimeSearch;  // 实时搜索复选框
+    private Timer searchTimer;            // 延迟定时器
     private FileTreeNode fileTreeRoot;
     private FileTree trFileTree;
     private FileTable tbFile;
@@ -143,6 +148,20 @@ public class FileExplorerWindow extends JFrame {
         btnRefresh = new JButton("刷新磁盘");
         chkVideoOnly = new JCheckBox("只显示视频文件");
         chkShowAllDisks = new JCheckBox("显示所有磁盘");
+        chkRealtimeSearch = new JCheckBox("实时搜索");
+        chkRealtimeSearch.setSelected(false);  // 默认不选中
+
+        // 初始化实时搜索定时器（700ms延迟）
+        searchTimer = new Timer(700, new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (chkRealtimeSearch.isSelected() && StringUtils.isNotBlank(tfSearch.getText())) {
+                    performSearch();  // 执行搜索
+                }
+            }
+        });
+        searchTimer.setRepeats(false);  // 仅触发一次，不重复
+
         JMenuItem mEchoIndexInfo;
 		mEchoIndexInfo = new JMenuItem("打开所在文件夹");
 		menu.add(mEchoIndexInfo);
@@ -321,7 +340,18 @@ public class FileExplorerWindow extends JFrame {
             return Long.compare(size1, size2);
         }
     };
-    
+
+    /**
+     * 执行文件搜索（供按钮、键盘、实时搜索调用）
+     */
+    private void performSearch() {
+        String keyword = tfSearch.getText();
+        if (StringUtils.isNotBlank(keyword)) {
+            List<File> files = DiskManager.getInstance().searchAllFiles(keyword);
+            updateSearchResult(files);
+        }
+    }
+
     /**
      * 更新搜索结果
      * @param files
@@ -664,11 +694,7 @@ public class FileExplorerWindow extends JFrame {
         btnSearch.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				String test = tfSearch.getText();
-				if(StringUtils.isNotBlank(test)) {
-					List<File> files = DiskManager.getInstance().searchAllFiles(test);
-					updateSearchResult(files);
-				}
+				performSearch();
 			}
 		});
         
@@ -676,14 +702,39 @@ public class FileExplorerWindow extends JFrame {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-					String test = tfSearch.getText();
-					if(StringUtils.isNotBlank(test)) {
-						List<File> files = DiskManager.getInstance().searchAllFiles(test);
-						updateSearchResult(files);
-					}
+					performSearch();
 				}
 			}
 		});
+
+        // 添加搜索框文本变化监听（实时搜索）
+        tfSearch.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                restartSearchTimer();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                restartSearchTimer();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                // JTextField 使用 PlainDocument，不会触发此事件
+                // 保留方法以满足 DocumentListener 接口要求
+                restartSearchTimer();
+            }
+
+            /**
+             * 重新启动搜索定时器（防抖处理）
+             */
+            private void restartSearchTimer() {
+                if (chkRealtimeSearch.isSelected()) {
+                    searchTimer.restart();
+                }
+            }
+        });
 
         btnSearchDir.addActionListener(new ActionListener() {
 			
@@ -769,7 +820,9 @@ public class FileExplorerWindow extends JFrame {
 
         JPanel pnlLeftTop = new JPanel();
         pnlLeftTop.setLayout(new GridBagLayout());
-        pnlLeftTop.add(chkShowAllDisks, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
+        pnlLeftTop.add(btnRefresh, new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.WEST,
+                GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
+        pnlLeftTop.add(chkShowAllDisks, new GridBagConstraints(1, 0, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
                 GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
 
         pnlLeft.setLayout(new GridBagLayout());
@@ -788,10 +841,12 @@ public class FileExplorerWindow extends JFrame {
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
         pnlTop.add(btnSearchDir,new GridBagConstraints(1, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(1, 0, 0, 0), 0, 0));
-        pnlTop.add(tfSearch,new GridBagConstraints(2, 0, 1, 1, 0.85, 1.0, GridBagConstraints.EAST,
+        pnlTop.add(tfSearch,new GridBagConstraints(2, 0, 1, 1, 0.82, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlTop.add(chkVideoOnly, new GridBagConstraints(3, 0, 1, 1, 0.05, 1.0, GridBagConstraints.EAST,
+        pnlTop.add(chkRealtimeSearch, new GridBagConstraints(3, 0, 1, 1, 0.13, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 5, 0, 0), 0, 0));
+        pnlTop.add(chkVideoOnly, new GridBagConstraints(3, 1, 1, 1, 0.13, 0.0, GridBagConstraints.EAST,
+                GridBagConstraints.BOTH, new Insets(2, 5, 0, 0), 0, 0));
 
 
         //路径
@@ -800,9 +855,7 @@ public class FileExplorerWindow extends JFrame {
         pnlTop.add(btnCleanSearch, new GridBagConstraints(1, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
-        pnlTop.add(tfDir,new GridBagConstraints(2, 1, 1, 1, 0.9, 1.0, GridBagConstraints.EAST,
-                GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlTop.add(btnRefresh, new GridBagConstraints(3, 1, 1, 1, 0.05, 1.0, GridBagConstraints.EAST,
+        pnlTop.add(tfDir,new GridBagConstraints(2, 1, 1, 1, 0.95, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
         spBottom.setLeftComponent(pnlLeft);
@@ -882,6 +935,10 @@ public class FileExplorerWindow extends JFrame {
             @Override
             public void windowClosed(WindowEvent e) {
                 super.windowClosed(e);
+                // 释放定时器资源
+                if (searchTimer != null && searchTimer.isRunning()) {
+                    searchTimer.stop();
+                }
             }
         });
         if(DiskManager.getInstance().listDisk().size()<1) {
