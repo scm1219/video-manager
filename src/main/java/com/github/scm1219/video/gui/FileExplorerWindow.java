@@ -95,6 +95,7 @@ public class FileExplorerWindow extends JFrame {
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private JPopupMenu menu = new JPopupMenu();
     private JMenuItem mNavigateTo;
+    private javax.swing.JLabel lblStatusBar;  // 状态栏标签
     private boolean videoOnly = false;
     private boolean showAllDisks = false;
     private boolean isSearchMode = false;
@@ -150,6 +151,7 @@ public class FileExplorerWindow extends JFrame {
         chkShowAllDisks = new JCheckBox("显示所有磁盘");
         chkRealtimeSearch = new JCheckBox("实时搜索");
         chkRealtimeSearch.setSelected(false);  // 默认不选中
+        lblStatusBar = new javax.swing.JLabel(" ");  // 初始化状态栏
 
         // 初始化实时搜索定时器（700ms延迟）
         searchTimer = new Timer(700, new ActionListener() {
@@ -358,11 +360,20 @@ public class FileExplorerWindow extends JFrame {
      */
     private void updateSearchResult(List<File> files) {
     	isSearchMode = true;
+    	// 统计已删除的文件数量
+    	int deletedCount = 0;
+    	for (File file : files) {
+    		if (!file.exists()) {
+    			deletedCount++;
+    		}
+    	}
     	File[] fileArray = new File[files.size()];
     	files.toArray(fileArray);
     	setFileTable(fileArray);
     	// 搜索后滚动条回到顶部
     	spTable.getViewport().setViewPosition(new Point(0, 0));
+    	// 更新状态栏显示搜索结果数量和已删除数量
+    	updateStatusBar(files.size(), true, deletedCount);
     }
     
     /**
@@ -410,6 +421,27 @@ public class FileExplorerWindow extends JFrame {
         tbFile.getColumnModel().getColumn(3).setPreferredWidth(50);
         tbFile.getColumnModel().getColumn(4).setPreferredWidth(150);
         spTable.getViewport().setBackground(Color.white);
+        
+        // 更新状态栏显示文件总数
+        updateStatusBar(fileList.size(), false, 0);
+    }
+    
+    /**
+     * 更新状态栏显示
+     * @param count 文件数量
+     * @param isSearch 是否为搜索模式
+     * @param deletedCount 已删除文件数量（仅搜索模式有效）
+     */
+    private void updateStatusBar(int count, boolean isSearch, int deletedCount) {
+        if (isSearch) {
+            if (deletedCount > 0) {
+                lblStatusBar.setText("搜索结果: " + count + " 个项目，已删除: " + deletedCount + " 个");
+            } else {
+                lblStatusBar.setText("搜索结果: " + count + " 个项目");
+            }
+        } else {
+            lblStatusBar.setText("共 " + count + " 个项目");
+        }
     }
 
     private File currentDir = null;
@@ -834,6 +866,8 @@ public class FileExplorerWindow extends JFrame {
         pnlRight.setLayout(new GridBagLayout());
         pnlRight.add(spTable,new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
+        pnlRight.add(lblStatusBar, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
+                GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0));
 
         //搜索
         pnlTop.setLayout(new GridBagLayout());
