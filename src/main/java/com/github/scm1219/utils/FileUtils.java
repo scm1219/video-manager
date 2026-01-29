@@ -7,12 +7,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
 @Slf4j
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
-public class FileUtils extends org.apache.commons.io.FileUtils{
+public class FileUtils {
 
 	private static String[] videoExtends = { ".mp4", ".mkv", ".rm", ".rmvb", "wmv", ".flv",".ogm" };
 
@@ -22,8 +20,7 @@ public class FileUtils extends org.apache.commons.io.FileUtils{
 	 */
 	public static void renameFiles(String dirName,String prefix) {
 		File dir = new File(dirName);
-//		File[] files = dir.listFiles();
-		Collection<File> listFiles = FileUtils.listFiles(dir, null, false);
+		Collection<File> listFiles = org.apache.commons.io.FileUtils.listFiles(dir, null, false);
 		List<File> ss = new ArrayList<>(listFiles);
 		Collections.sort(ss);
 		String filePrefix=prefix;

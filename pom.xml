@@ -7,6 +7,11 @@
 	<artifactId>video-manager</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
+	<description>移动设备视频文件管理</description>
+	<organization>
+		<name>scm1219</name>
+	</organization>
+	<inceptionYear>2025</inceptionYear>
 
 	<name>video-manager</name>
 	<url>http://maven.apache.org</url>
@@ -166,6 +171,7 @@
 								<requiresJdk>false</requiresJdk>
 								<maxHeapSize>256</maxHeapSize>
 								<initialHeapSize>64</initialHeapSize>
+								<path>%JAVA_HOME%;%PATH%</path>
 							</jre>
 							<versionInfo>
 								<fileVersion>1.0.0.0</fileVersion>
@@ -185,7 +191,6 @@
 								<jreNotFoundErr>jre not found</jreNotFoundErr>
 								<jreVersionErr>java version error</jreVersionErr>
 								<launcherErr>launcher error</launcherErr>
-								<!-- Used by console header only. -->
 								<instanceAlreadyExistsMsg>实例已经启动</instanceAlreadyExistsMsg>
 							</messages>
 						</configuration>
