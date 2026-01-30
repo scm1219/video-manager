@@ -10,7 +10,9 @@ import com.github.scm1219.utils.FileUtils;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @ToString
 @EqualsAndHashCode
 public class Disk {
@@ -63,9 +65,15 @@ public class Disk {
 	private boolean findVideoDir(File parent,List<File> result,JProgressBar bar,boolean isTop) {
 		File[] subDirs = parent.listFiles();
 		boolean currentVideo= hasVideoFiles(parent);
-		
+
 		if(subDirs!=null) {
-			for (File  subDir: subDirs) {
+			for (File subDir: subDirs) {
+				// 检查是否取消（每个目录都检查）
+				if(index.isCancelled()) {
+					log.info("已经取消检查");
+					throw new IndexCancelledException();
+				}
+
 				if(bar!=null && isTop) {
 					bar.setString("检查"+subDir.getAbsolutePath()+"是否需要扫描");
 				}

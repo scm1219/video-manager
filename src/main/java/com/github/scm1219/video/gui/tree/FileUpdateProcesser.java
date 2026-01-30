@@ -18,6 +18,7 @@ import javax.swing.WindowConstants;
 
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.Index.IndexStatistics;
+import com.github.scm1219.video.domain.IndexCancelledException;
 
 
 public class FileUpdateProcesser extends JFrame {
@@ -87,7 +88,21 @@ public class FileUpdateProcesser extends JFrame {
 				}else if(button.getText().equals("关闭")) {
 					frame.dispose();
 				}else if(button.getText().equals("取消")) {
+					// 二次确认
+					int confirm = javax.swing.JOptionPane.showConfirmDialog(frame,
+							"确定要取消索引创建吗？\n\n将恢复到索引前的状态，已扫描的数据将丢失。",
+							"确认取消",
+							javax.swing.JOptionPane.YES_NO_OPTION,
+							javax.swing.JOptionPane.WARNING_MESSAGE);
 
+					if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+						// 通知索引线程取消
+						disk.getIndex().cancel(null);
+
+						// 更新UI状态
+						button.setEnabled(false);
+						progressBar.setString("正在取消索引...");
+					}
 				}
 			}
 		});
@@ -143,38 +158,55 @@ public class FileUpdateProcesser extends JFrame {
 
 		public void run() {
 			textArea.setText("");
-			//开始更新后禁用按钮
-			button.setEnabled(false);
+			//开始更新后设置按钮为可点击的取消按钮
+			button.setEnabled(true);
 			button.setText("取消");
 			bar.setStringPainted(true);
 			//采用确定的进度条样式
 			bar.setIndeterminate(false);
 			long t1 = System.currentTimeMillis();
 
-			// 根据是否有目标目录选择不同的索引方法
-			if(targetDirectory == null) {
-				// 整盘索引
-				disk.getIndex().create(disk,bar);
-			} else {
-				// 目录级索引
-				IndexStatistics stats = disk.getIndex().createForDirectory(targetDirectory, bar);
+			try {
+				// 根据是否有目标目录选择不同的索引方法
+				if(targetDirectory == null) {
+					// 整盘索引
+					disk.getIndex().create(disk,bar);
+				} else {
+					// 目录级索引
+					IndexStatistics stats = disk.getIndex().createForDirectory(targetDirectory, bar);
+					long t2 = System.currentTimeMillis();
+					bar.setString("扫描完成，耗时："+(t2-t1)+"ms\n");
+					textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n" +
+								   "状态: 扫描完成\n" +
+								   stats.toFormattedString() +
+								   "总耗时: " + (t2-t1) + "ms");
+				}
+
 				long t2 = System.currentTimeMillis();
-				bar.setString("扫描完成，耗时："+(t2-t1)+"ms\n");
-				textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n" +
-							   "状态: 扫描完成\n" +
-							   stats.toFormattedString() +
-							   "总耗时: " + (t2-t1) + "ms");
+
+				if(targetDirectory == null) {
+					bar.setString("索引创建完成，耗时："+(t2-t1)+"ms\n");
+					textArea.setText(disk.getIndex().getInfoString());
+				}
+
+				button.setText("关闭");
+				button.setEnabled(true);
+
+			} catch (IndexCancelledException e) {
+				// 用户取消索引
+				bar.setString("索引已取消，已恢复到原状态");
+				textArea.setText("索引已取消\n已恢复到索引前的状态");
+				button.setText("关闭");
+				button.setEnabled(true);
+
+			} catch (Exception e) {
+				// 其他异常
+				bar.setString("索引创建失败");
+				textArea.setText("错误: " + e.getMessage());
+				button.setText("关闭");
+				button.setEnabled(true);
+				e.printStackTrace();
 			}
-
-			long t2 = System.currentTimeMillis();
-
-			if(targetDirectory == null) {
-				bar.setString("索引创建完成，耗时："+(t2-t1)+"ms\n");
-				textArea.setText(disk.getIndex().getInfoString());
-			}
-
-			button.setText("关闭");
-			button.setEnabled(true);
 		}
 
 	}
