@@ -95,6 +95,7 @@ public class FileExplorerWindow extends JFrame {
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private JPopupMenu menu = new JPopupMenu();
     private JMenuItem mNavigateTo;
+    private JMenuItem mScanDirectory;
     private javax.swing.JLabel lblStatusBar;  // 状态栏标签
     private boolean videoOnly = false;
     private boolean showAllDisks = false;
@@ -186,7 +187,6 @@ public class FileExplorerWindow extends JFrame {
 		});
 
 		// 新增：扫描此目录菜单项
-		JMenuItem mScanDirectory;
 		mScanDirectory = new JMenuItem("扫描此目录");
 		menu.add(mScanDirectory);
 		mScanDirectory.addActionListener(new ActionListener() {
@@ -249,7 +249,26 @@ public class FileExplorerWindow extends JFrame {
                 // 检测文件存在性
                 if (canNavigateToFile(file)) {
                     File parentDir = file.getParentFile();
-                    updateTable(parentDir, false);
+
+                    stackFile.clear();  // 清空旧的历史记录
+
+                    // 重建完整的目录层级路径（从根目录到父目录）
+                    File current = parentDir;
+                    java.util.Stack<File> tempStack = new java.util.Stack<>();
+
+                    // 从父目录向上遍历到根目录
+                    while (current != null && current.exists()) {
+                        tempStack.push(current);
+                        current = current.getParentFile();
+                    }
+
+                    // 反向压入栈（从根到父目录）
+                    while (!tempStack.isEmpty()) {
+                        stackFile.push(tempStack.pop());
+                    }
+
+                    // 使用 true 参数避免重复压入 parentDir
+                    updateTable(parentDir, true);
                 } else {
                     JOptionPane.showMessageDialog(FileExplorerWindow.this,
                         file == null || !file.exists() ? "文件不存在" : "父目录不存在或无法访问",
@@ -628,6 +647,57 @@ public class FileExplorerWindow extends JFrame {
         worker.execute();
     }
 
+    /**
+     * 更新文件表格并重建完整的目录路径层级（用于目录树点击）
+     * @param file 目标目录
+     */
+    private void updateTableWithPath(File file) {
+        isSearchMode = false;
+        String path = file.getAbsolutePath();
+        if (path == null)
+            return;
+        tfDir.setText(path);
+        currentDir = file;
+
+        // 重建完整的目录层级路径（从根目录到目标目录）
+        File current = file;
+        java.util.Stack<File> tempStack = new java.util.Stack<>();
+
+        // 从目标目录向上遍历到根目录
+        while (current != null && current.exists()) {
+            tempStack.push(current);
+            current = current.getParentFile();
+        }
+
+        // 反向压入栈（从根到目标目录）
+        stackFile.clear();
+        while (!tempStack.isEmpty()) {
+            stackFile.push(tempStack.pop());
+        }
+
+        final File targetFile = file;
+
+        SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
+            @Override
+            protected File[] doInBackground() {
+                return fileSystemView.getFiles(targetFile, false);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    File[] files = get();
+                    // 判断是否在磁盘根目录
+                    boolean isRootDirectory = isDiskRoot(targetFile);
+                    setFileTable(files, !isRootDirectory);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        };
+        worker.execute();
+    }
+
     private void AddComponentListener(){
         trFileTree.addTreeSelectionListener(new TreeSelectionListener(){
             @Override
@@ -636,7 +706,7 @@ public class FileExplorerWindow extends JFrame {
                 FileTreeNode selectNode = (FileTreeNode)tree.getLastSelectedPathComponent();
                 if (selectNode != null){
                     File file = selectNode.getFile();
-                    updateTable(file, false);
+                    updateTableWithPath(file);
                 }
             }
         });
@@ -650,7 +720,7 @@ public class FileExplorerWindow extends JFrame {
                     FileTreeNode selectNode = (FileTreeNode)tree.getLastSelectedPathComponent();
                     if (selectNode != null){
                         File file = selectNode.getFile();
-                        updateTable(file, false);
+                        updateTableWithPath(file);
                     }
                 }
             }
@@ -699,6 +769,9 @@ public class FileExplorerWindow extends JFrame {
 
                 	// 动态控制"转到"菜单项状态
                 	mNavigateTo.setEnabled(isSearchMode && canNavigateToFile(file));
+
+                	// 仅对文件夹显示"扫描此目录"菜单项
+                	mScanDirectory.setVisible(file.isDirectory());
 
                 	menu.show(tbFile, e.getX(), e.getY());
                 }
