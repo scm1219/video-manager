@@ -575,6 +575,7 @@ public class Index {
 				if(bar!=null) {
 					bar.setString("删除旧索引记录...");
 				}
+				
 
 				// 统计删除前的记录数
 				int deletedCount = 0;
@@ -586,6 +587,7 @@ public class Index {
 						deletedCount = rs.getInt(1);
 					}
 				}
+				log.debug("删除 \"{}\" 下的旧索引记录，共{}条", dirPath, deletedCount);
 				stats.setDeletedCount(deletedCount);
 
 				// 删除该目录下的所有旧记录
@@ -639,7 +641,6 @@ public class Index {
 						// 统一路径分隔符
 						filePath = filePath.replace("\\", "/");
 						fileDirPath = fileDirPath.replace("\\", "/");
-
 						pstmt.setString(1, fileName);
 						pstmt.setString(2, dirName);
 						pstmt.setString(3, filePath);
@@ -767,5 +768,185 @@ public class Index {
 		}
 	}
 
+	/**
+	 * 验证并清理索引中的无效记录（文件已不存在的记录）
+	 * <p>此方法会遍历索引中的所有记录，检查对应的文件是否真实存在，
+	 * 删除那些文件已被移除或删除的索引记录。</p>
+	 *
+	 * @param bar 进度条（可为null）
+	 * @return 清理统计信息
+	 */
+	public IndexStatistics validateAndCleanup(JProgressBar bar) {
+		long startTime = System.currentTimeMillis();
+		IndexStatistics stats = new IndexStatistics();
+
+		if(bar != null) {
+			bar.setString("开始验证索引...");
+		}
+		log.info("开始验证索引，检查无效记录");
+
+		try {
+			// 获取当前盘符
+			String currentDrive = indexFile.getAbsolutePath().split(":")[0];
+
+			// 获取数据库连接
+			try(Connection conn = getConnection()) {
+				conn.setAutoCommit(false);
+
+				try {
+					// 步骤1：查询所有索引记录
+					List<String> invalidPaths = new ArrayList<>();
+					int totalRecords = 0;
+					int checkedCount = 0;
+
+					if(bar != null) {
+						bar.setString("正在读取索引记录...");
+					}
+
+					// 先获取总记录数
+					try(Statement stmt = conn.createStatement()) {
+						ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM files");
+						if(rs.next()) {
+							totalRecords = rs.getInt(1);
+						}
+					}
+
+					stats.setTotalCount(totalRecords);
+					log.info("索引中共有 {} 条记录需要验证", totalRecords);
+
+					if(totalRecords == 0) {
+						if(bar != null) {
+							bar.setString("索引为空，无需清理");
+						}
+						stats.setScanTime(System.currentTimeMillis() - startTime);
+						return stats;
+					}
+
+					// 查询所有文件路径
+					String sql = "SELECT filePath FROM files";
+					try(Statement stmt = conn.createStatement();
+						ResultSet rs = stmt.executeQuery(sql)) {
+
+						while(rs.next()) {
+							String filePath = rs.getString(1);
+							String fullPath = currentDrive + ":" + filePath;
+							File file = new File(fullPath);
+
+							checkedCount++;
+
+							// 更新进度
+							if(bar != null && totalRecords > 0) {
+								int progress = checkedCount * 100 / totalRecords;
+								bar.setValue(progress);
+								bar.setString("验证中 " + checkedCount + "/" + totalRecords);
+							}
+
+							// 检查文件是否存在
+							if(!file.exists()) {
+								invalidPaths.add(filePath);
+								log.debug("发现无效记录: {}", fullPath);
+							}
+
+							// 每100条记录检查一次取消
+							if(checkedCount % 100 == 0) {
+								checkCancelled();
+							}
+						}
+					}
+
+					// 步骤2：删除无效记录
+					if(!invalidPaths.isEmpty()) {
+						if(bar != null) {
+							bar.setString("删除 " + invalidPaths.size() + " 条无效记录...");
+						}
+
+						log.info("发现 {} 条无效记录，开始删除", invalidPaths.size());
+						stats.setDeletedCount(invalidPaths.size());
+
+						try(PreparedStatement pstmt = conn.prepareStatement(
+								"DELETE FROM files WHERE filePath = ?")) {
+
+							int count = 0;
+							for(String invalidPath : invalidPaths) {
+								pstmt.setString(1, invalidPath);
+								pstmt.addBatch();
+								count++;
+
+								// 每100条执行一次批量删除
+								if(count >= 100) {
+									pstmt.executeBatch();
+									count = 0;
+									checkCancelled();
+								}
+							}
+
+							// 删除剩余记录
+							if(count > 0) {
+								pstmt.executeBatch();
+							}
+						}
+
+						// 提交事务
+						conn.commit();
+						log.info("成功删除 {} 条无效记录", invalidPaths.size());
+
+						if(bar != null) {
+							bar.setValue(100);
+							bar.setString("清理完成！删除了 " + invalidPaths.size() + " 条无效记录");
+						}
+					} else {
+						log.info("未发现无效记录，索引完整");
+						if(bar != null) {
+							bar.setValue(100);
+							bar.setString("验证完成！索引完整，无需清理");
+						}
+					}
+
+					conn.setAutoCommit(true);
+					stats.setScanTime(System.currentTimeMillis() - startTime);
+
+				} catch (IndexCancelledException e) {
+					// 用户取消
+					log.info("索引验证被用户取消");
+					try {
+						conn.rollback();
+						conn.setAutoCommit(true);
+					} catch (SQLException ex) {
+						log.error("事务回滚失败", ex);
+					}
+					stats.setScanTime(System.currentTimeMillis() - startTime);
+					throw e;
+				} catch (Exception e) {
+					// 其他异常：回滚事务
+					try {
+						if(!conn.getAutoCommit()) {
+							conn.rollback();
+							conn.setAutoCommit(true);
+						}
+					} catch (SQLException ex) {
+						log.error("事务回滚失败", ex);
+					}
+					stats.setScanTime(System.currentTimeMillis() - startTime);
+					throw new RuntimeException("验证索引失败: " + e.getMessage(), e);
+				}
+			}
+
+		} catch (IndexCancelledException e) {
+			// 取消异常已在上面处理
+			if(bar != null) {
+				bar.setString("验证已取消");
+			}
+			return stats;
+
+		} catch (Exception e) {
+			log.error("验证索引失败", e);
+			if(bar != null) {
+				bar.setString("验证失败: " + e.getMessage());
+			}
+			throw new RuntimeException("验证索引失败: " + e.getMessage(), e);
+		}
+
+		return stats;
+	}
 
 }

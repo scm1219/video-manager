@@ -63,6 +63,7 @@ import com.github.scm1219.video.gui.tree.FileTree;
 import com.github.scm1219.video.gui.tree.FileTreeCellRenderer;
 import com.github.scm1219.video.gui.tree.FileTreeNode;
 import com.github.scm1219.video.gui.tree.FileUpdateProcesser;
+import com.github.scm1219.video.gui.tree.IndexValidationProcesser;
 import com.github.scm1219.utils.FileUtils;
 
 import java.awt.Font;
@@ -298,7 +299,7 @@ public class FileExplorerWindow extends JFrame {
     		{"跟随系统", ThemeManager.THEME_AUTO}
     	};
 
-    	// 循环创建菜单项
+    	// 循环创建主题菜单项
     	for (String[] config : themeConfigs) {
     		JMenuItem item = new JMenuItem(config[0]);
     		final String themeCode = config[1]; // 使用 final 变量供 lambda 使用
@@ -309,8 +310,95 @@ public class FileExplorerWindow extends JFrame {
     	// 将主题菜单添加到菜单栏
     	menuBar.add(themeMenu);
 
+    	// 创建索引菜单
+    	JMenu indexMenu = new JMenu("索引");
+
+    	// 验证并清理索引菜单项
+    	JMenuItem validateAndCleanupItem = new JMenuItem("验证并清理索引");
+    	validateAndCleanupItem.addActionListener(e -> validateAndCleanupIndex());
+    	indexMenu.add(validateAndCleanupItem);
+
+    	// 将索引菜单添加到菜单栏
+    	menuBar.add(indexMenu);
+
     	// 设置窗口的菜单栏
     	this.setJMenuBar(menuBar);
+    }
+
+    /**
+     * 验证并清理所有磁盘的索引
+     */
+    private void validateAndCleanupIndex() {
+    	List<Disk> disks = DiskManager.getInstance().listDisk();
+    	if(disks.isEmpty()) {
+    		JOptionPane.showMessageDialog(this,
+    			"未发现需要索引的磁盘",
+    			"提示",
+    			JOptionPane.INFORMATION_MESSAGE);
+    		return;
+    	}
+
+    	// 询问用户选择磁盘
+    	if(disks.size() == 1) {
+    		// 只有一个磁盘，直接执行
+    		performValidateAndCleanup(disks.get(0));
+    	} else {
+    		// 多个磁盘，让用户选择
+    		Object[] options = new Object[disks.size()];
+    		for(int i = 0; i < disks.size(); i++) {
+    			Disk disk = disks.get(i);
+    			String displayName = fileSystemView.getSystemDisplayName(disk.getRoot());
+    			if(displayName == null || displayName.isEmpty()) {
+    				displayName = disk.getPath();
+    			}
+    			options[i] = displayName + " (" + disk.getPath() + ")";
+    		}
+
+    		int selected = JOptionPane.showOptionDialog(this,
+    			"请选择要验证的磁盘:",
+    			"选择磁盘",
+    			JOptionPane.YES_NO_CANCEL_OPTION,
+    			JOptionPane.QUESTION_MESSAGE,
+    			null,
+    			options,
+    			options[0]);
+
+    		if(selected >= 0 && selected < disks.size()) {
+    			performValidateAndCleanup(disks.get(selected));
+    		}
+    	}
+    }
+
+    /**
+     * 执行索引验证和清理
+     * @param disk 要验证的磁盘
+     */
+    private void performValidateAndCleanup(Disk disk) {
+    	// 检查索引是否存在
+    	if(!disk.getIndex().exists()) {
+    		JOptionPane.showMessageDialog(this,
+    			"该磁盘尚未创建索引\n请先执行整盘索引创建",
+    			"提示",
+    			JOptionPane.INFORMATION_MESSAGE);
+    		return;
+    	}
+
+    	// 检查是否正在索引
+    	if(disk.getIndex().isIndexing()) {
+    		JOptionPane.showMessageDialog(this,
+    			"索引正在创建中，请稍后再试",
+    			"提示",
+    			JOptionPane.INFORMATION_MESSAGE);
+    		return;
+    	}
+
+    	// 启动验证和清理进程
+    	new Thread(new Runnable() {
+    		@Override
+    		public void run() {
+    			new IndexValidationProcesser(disk).setVisible(true);
+    		}
+    	}).start();
     }
 
     /**
