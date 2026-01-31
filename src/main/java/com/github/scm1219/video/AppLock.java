@@ -1,11 +1,11 @@
 package com.github.scm1219.video;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.channels.FileChannel;
 import java.nio.channels.FileLock;
 import java.nio.channels.OverlappingFileLockException;
+import java.nio.file.StandardOpenOption;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -79,9 +79,8 @@ public class AppLock {
             String userHome = System.getProperty("user.home");
             lockFile = new File(userHome, APP_DIR + File.separator + LOCK_FILE_NAME);
 
-            // 3. 创建文件输出流（文件不存在会自动创建）
-            FileOutputStream fos = new FileOutputStream(lockFile);
-            channel = fos.getChannel();
+            // 3. 直接打开文件通道（避免中间流资源泄漏告警）
+            channel = FileChannel.open(lockFile.toPath(), StandardOpenOption.CREATE, StandardOpenOption.WRITE);
 
             // 4. 尝试获取独占锁（非阻塞）
             lock = channel.tryLock();
