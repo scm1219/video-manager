@@ -190,4 +190,44 @@ public class ThemeManager {
                 return "浅色主题";
         }
     }
+
+    /**
+     * 获取当前主题的主色调颜色（用于标题）
+     * @return 十六进制颜色代码
+     */
+    public static String getPrimaryColor() {
+    	// 检测当前是否为深色主题
+    	boolean isDark = FlatLaf.isLafDark();
+    	if (isDark) {
+    		return "#64B5F6"; // 深色主题：浅蓝色
+    	} else {
+    		return "#1976D2"; // 浅色主题：深蓝色
+    	}
+    }
+
+    /**
+     * 获取当前主题的文本颜色（用于小标题）
+     * @return 十六进制颜色代码
+     */
+    public static String getTextColor() {
+    	boolean isDark = FlatLaf.isLafDark();
+    	if (isDark) {
+    		return "#B0BEC5"; // 深色主题：浅灰色
+    	} else {
+    		return "#424242"; // 浅色主题：深灰色
+    	}
+    }
+
+    /**
+     * 获取当前主题的次要文本颜色（用于提示信息）
+     * @return 十六进制颜色代码
+     */
+    public static String getSecondaryTextColor() {
+    	boolean isDark = FlatLaf.isLafDark();
+    	if (isDark) {
+    		return "#90A4AE"; // 深色主题：中灰色
+    	} else {
+    		return "#666666"; // 浅色主题：中灰色
+    	}
+    }
 }

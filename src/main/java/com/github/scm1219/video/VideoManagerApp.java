@@ -5,6 +5,7 @@ import java.awt.Toolkit;
 
 import javax.imageio.ImageIO;
 import javax.swing.JFrame;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
@@ -14,10 +15,19 @@ import com.github.scm1219.video.gui.ThemeManager;
 
 public class VideoManagerApp {
 	public static void main(String args[]){
+
+        setLookAndFeel();
+		// 单实例检查：防止应用多实例启动
+		if (!AppLock.getInstance().acquire()) {
+			showAlreadyRunningDialog();
+			System.exit(1);
+			return;
+		}
+
 		DiskManager m = DiskManager.getInstance();
 		m.loadDisks();
 		
-        setLookAndFeel();
+        
 
         final JFrame frame=new FileExplorerWindow();
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
@@ -60,6 +70,32 @@ public class VideoManagerApp {
             } catch (Exception ex) {
                 System.err.println("系统外观加载失败: " + ex.getMessage());
             }
+        }
+    }
+
+    /**
+     * 显示应用已在运行的错误对话框
+     *
+     * <p>当检测到已有应用实例运行时，调用此方法提示用户。</p>
+     */
+    private static void showAlreadyRunningDialog() {
+        try {
+            
+            String message = "Video Manager 已经在运行中。\n\n" +
+                            "请不要同时启动多个实例。\n" +
+                            "如果确定没有其他实例运行，请检查并删除以下文件：\n" +
+                            AppLock.getInstance().getLockFile().getAbsolutePath();
+
+            JOptionPane.showMessageDialog(
+                    null,
+                    message,
+                    "应用程序已在运行",
+                    JOptionPane.ERROR_MESSAGE
+            );
+        } catch (Exception e) {
+            // 如果对话框显示失败（如无图形界面），输出到控制台
+            System.err.println("应用程序已在运行，无法启动新实例。");
+            System.err.println("锁文件位置: " + AppLock.getInstance().getLockFile().getAbsolutePath());
         }
     }
 }

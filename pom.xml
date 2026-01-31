@@ -5,7 +5,7 @@
 
 	<groupId>com.github.scm1219</groupId>
 	<artifactId>video-manager</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>1.1.0-RELEASE</version>
 	<packaging>jar</packaging>
 	<description>移动设备视频文件管理</description>
 	<organization>
