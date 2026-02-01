@@ -111,7 +111,8 @@ public class IndexValidationProcesser extends JFrame {
 		label.setText("验证磁盘: " + disk.getPath());
 		progressBar.setString("准备验证索引...");
 		textArea.setText("点击【开始验证】开始检查索引记录的有效性\n");
-		textArea.append("该操作将删除文件已不存在的索引记录\n");
+		textArea.append("• 该操作将删除文件已不存在的索引记录\n");
+		textArea.append("• 删除后不可恢复，只能重建索引\n");
 	}
 
 	/**

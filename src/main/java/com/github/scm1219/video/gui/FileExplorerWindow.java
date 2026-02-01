@@ -32,6 +32,8 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JRadioButtonMenuItem;
+import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
@@ -70,7 +72,6 @@ import com.github.scm1219.video.gui.tree.FileTree;
 import com.github.scm1219.video.gui.tree.FileTreeCellRenderer;
 import com.github.scm1219.video.gui.tree.FileTreeNode;
 import com.github.scm1219.video.gui.tree.FileUpdateProcesser;
-import com.github.scm1219.video.gui.tree.IndexValidationProcesser;
 import com.github.scm1219.utils.FileUtils;
 
 import java.awt.Font;
@@ -105,6 +106,9 @@ public class FileExplorerWindow extends JFrame {
     private JMenuItem mNavigateTo;
     private JMenuItem mScanDirectory;
     private javax.swing.JLabel lblStatusBar;  // 状态栏标签
+    private JRadioButtonMenuItem themeLightMenuItem;
+    private JRadioButtonMenuItem themeDarkMenuItem;
+    private JRadioButtonMenuItem themeAutoMenuItem;
     private boolean videoOnly = false;
     private boolean showAllDisks = false;
     private boolean isSearchMode = false;
@@ -299,20 +303,32 @@ public class FileExplorerWindow extends JFrame {
     	// 创建主题菜单
     	JMenu themeMenu = new JMenu("主题");
 
-    	// 定义主题配置：显示名称 + 主题代码
-    	String[][] themeConfigs = {
-    		{"浅色主题", ThemeManager.THEME_LIGHT},
-    		{"深色主题", ThemeManager.THEME_DARK},
-    		{"跟随系统", ThemeManager.THEME_AUTO}
-    	};
+    	// 创建单选按钮组
+    	ButtonGroup themeButtonGroup = new ButtonGroup();
 
-    	// 循环创建主题菜单项
-    	for (String[] config : themeConfigs) {
-    		JMenuItem item = new JMenuItem(config[0]);
-    		final String themeCode = config[1]; // 使用 final 变量供 lambda 使用
-    		item.addActionListener(e -> switchTheme(themeCode));
-    		themeMenu.add(item);
-    	}
+    	// 创建浅色主题菜单项
+    	themeLightMenuItem = new JRadioButtonMenuItem("浅色主题");
+    	final String themeLightCode = ThemeManager.THEME_LIGHT;
+    	themeLightMenuItem.addActionListener(e -> switchTheme(themeLightCode));
+    	themeButtonGroup.add(themeLightMenuItem);
+    	themeMenu.add(themeLightMenuItem);
+
+    	// 创建深色主题菜单项
+    	themeDarkMenuItem = new JRadioButtonMenuItem("深色主题");
+    	final String themeDarkCode = ThemeManager.THEME_DARK;
+    	themeDarkMenuItem.addActionListener(e -> switchTheme(themeDarkCode));
+    	themeButtonGroup.add(themeDarkMenuItem);
+    	themeMenu.add(themeDarkMenuItem);
+
+    	// 创建跟随系统主题菜单项
+    	themeAutoMenuItem = new JRadioButtonMenuItem("跟随系统");
+    	final String themeAutoCode = ThemeManager.THEME_AUTO;
+    	themeAutoMenuItem.addActionListener(e -> switchTheme(themeAutoCode));
+    	themeButtonGroup.add(themeAutoMenuItem);
+    	themeMenu.add(themeAutoMenuItem);
+
+    	// 根据当前主题设置选中状态
+    	updateThemeMenuSelection();
 
     	// 将主题菜单添加到菜单栏
     	menuBar.add(themeMenu);
@@ -363,8 +379,16 @@ public class FileExplorerWindow extends JFrame {
 
     	// 询问用户选择磁盘
     	if(disks.size() == 1) {
-    		// 只有一个磁盘，直接执行
-    		performValidateAndCleanup(disks.get(0));
+    		// 只有一个磁盘，显示警告并确认
+    		Disk disk = disks.get(0);
+    		String displayName = fileSystemView.getSystemDisplayName(disk.getRoot());
+    		if(displayName == null || displayName.isEmpty()) {
+    			displayName = disk.getPath();
+    		}
+
+    		if(confirmIndexCheck(displayName) == JOptionPane.YES_OPTION) {
+    			disk.performValidateAndCleanup(this);
+    		}
     	} else {
     		// 多个磁盘，让用户选择
     		Object[] options = new Object[disks.size()];
@@ -387,42 +411,31 @@ public class FileExplorerWindow extends JFrame {
     			options[0]);
 
     		if(selected >= 0 && selected < disks.size()) {
-    			performValidateAndCleanup(disks.get(selected));
+    			Disk selectedDisk = disks.get(selected);
+    			String selectedDisplayName = fileSystemView.getSystemDisplayName(selectedDisk.getRoot());
+    			if(selectedDisplayName == null || selectedDisplayName.isEmpty()) {
+    				selectedDisplayName = selectedDisk.getPath();
+    			}
+    			// 显示二次确认警告
+    			if(confirmIndexCheck(selectedDisplayName) == JOptionPane.YES_OPTION) {
+    				selectedDisk.performValidateAndCleanup(this);
+    			}
     		}
     	}
     }
 
-    /**
-     * 执行索引验证和清理
-     * @param disk 要验证的磁盘
-     */
-    private void performValidateAndCleanup(Disk disk) {
-    	// 检查索引是否存在
-    	if(!disk.getIndex().exists()) {
-    		JOptionPane.showMessageDialog(this,
-    			"该磁盘尚未创建索引\n请先执行整盘索引创建",
-    			"提示",
-    			JOptionPane.INFORMATION_MESSAGE);
-    		return;
-    	}
-
-    	// 检查是否正在索引
-    	if(disk.getIndex().isIndexing()) {
-    		JOptionPane.showMessageDialog(this,
-    			"索引正在创建中，请稍后再试",
-    			"提示",
-    			JOptionPane.INFORMATION_MESSAGE);
-    		return;
-    	}
-
-    	// 启动验证和清理进程
-    	new Thread(new Runnable() {
-    		@Override
-    		public void run() {
-    			new IndexValidationProcesser(disk).setVisible(true);
-    		}
-    	}).start();
-    }
+	private int confirmIndexCheck(String selectedDisplayName) {
+		return JOptionPane.showConfirmDialog(this,
+			"确定要验证并清理磁盘 \"" + selectedDisplayName + "\" 的索引吗？\n\n" +
+			"⚠️ 警告：此操作将执行以下操作：\n" +
+			"   • 删除索引中指向已不存在文件的记录\n" +
+			"   • 清理无效的索引数据\n" +
+			"   • 无法恢复已删除的索引记录\n\n" +
+			"建议：执行前请确保磁盘已正确连接。",
+			"确认索引清理",
+			JOptionPane.YES_NO_OPTION,
+			JOptionPane.WARNING_MESSAGE);
+	}
 
     /**
      * 获取应用程序版本号
@@ -573,29 +586,58 @@ public class FileExplorerWindow extends JFrame {
     }
 
     /**
+     * 更新主题菜单的选中状态
+     */
+    private void updateThemeMenuSelection() {
+    	String currentTheme = ThemeManager.getInstance().getCurrentTheme();
+
+    	// 根据当前主题设置对应的单选按钮为选中状态
+    	switch (currentTheme.toLowerCase()) {
+    		case ThemeManager.THEME_DARK:
+    			themeDarkMenuItem.setSelected(true);
+    			break;
+    		case ThemeManager.THEME_AUTO:
+    			themeAutoMenuItem.setSelected(true);
+    			break;
+    		case ThemeManager.THEME_LIGHT:
+    		default:
+    			themeLightMenuItem.setSelected(true);
+    			break;
+    	}
+    }
+
+    /**
      * 切换主题
      * @param themeName 主题名称（light/dark/auto）
      */
     private void switchTheme(String themeName) {
+    	// 检查是否与当前主题相同，相同则不执行切换
+    	String currentTheme = ThemeManager.getInstance().getCurrentTheme();
+    	if (currentTheme.equalsIgnoreCase(themeName)) {
+    		return;
+    	}
+
     	boolean success = ThemeManager.getInstance().applyTheme(themeName);
     	if (success) {
     		// 刷新所有组件的 UI
     		ThemeManager.updateUI();
     		updateIndexInfo();
+    		// 更新主题菜单选中状态
+    		updateThemeMenuSelection();
     		// 显示切换成功提示
     		JOptionPane.showMessageDialog(this,
     			"已切换到" + ThemeManager.getThemeDisplayName(themeName),
     			"主题切换",
     			JOptionPane.INFORMATION_MESSAGE);
     	} else {
-    		
+
     		// 显示切换失败提示
     		JOptionPane.showMessageDialog(this,
     			"主题切换失败，请查看控制台日志",
     			"错误",
     			JOptionPane.ERROR_MESSAGE);
     	}
-    	
+
     }
 
     public static final Comparator<File> FILE_COMPARATOR= new Comparator<File>() {

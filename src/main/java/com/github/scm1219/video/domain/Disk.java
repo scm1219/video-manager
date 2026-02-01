@@ -4,9 +4,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
+import javax.swing.JOptionPane;
 import javax.swing.JProgressBar;
 
 import com.github.scm1219.utils.FileUtils;
+import com.github.scm1219.video.gui.FileExplorerWindow;
+import com.github.scm1219.video.gui.tree.IndexValidationProcesser;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -121,4 +124,36 @@ public class Disk {
 	public void initEmptyDatabase() {
 		index.initEmptyTables();
 	}
+	
+	/**
+     * 执行索引验证和清理
+     * @param disk 要验证的磁盘
+     */
+    public void performValidateAndCleanup(FileExplorerWindow window) {
+    	// 检查索引是否存在
+    	if(!getIndex().exists()) {
+    		JOptionPane.showMessageDialog(window,
+    			"该磁盘尚未创建索引\n请先执行整盘索引创建",
+    			"提示",
+    			JOptionPane.INFORMATION_MESSAGE);
+    		return;
+    	}
+
+    	// 检查是否正在索引
+    	if(getIndex().isIndexing()) {
+    		JOptionPane.showMessageDialog(window,
+    			"索引正在创建中，请稍后再试",
+    			"提示",
+    			JOptionPane.INFORMATION_MESSAGE);
+    		return;
+    	}
+    	Disk target = this;
+    	// 启动验证和清理进程
+    	new Thread(new Runnable() {
+    		@Override
+    		public void run() {
+    			new IndexValidationProcesser(target).setVisible(true);
+    		}
+    	}).start();
+    }
 }
