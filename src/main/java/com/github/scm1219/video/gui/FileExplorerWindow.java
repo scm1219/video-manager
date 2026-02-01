@@ -45,10 +45,14 @@ import javax.swing.InputMap;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
+import javax.swing.JEditorPane;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
+import javax.swing.event.HyperlinkEvent;
+import javax.swing.event.HyperlinkListener;
+import java.awt.Desktop;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultTreeModel;
@@ -484,8 +488,17 @@ public class FileExplorerWindow extends JFrame {
     		</html>
     		""", primaryColor, textColor, textColor, textColor, textColor, textColor);
 
+    	// 创建 JEditorPane 并设置 HTML 内容
+    	JEditorPane editorPane = new JEditorPane("text/html", helpHtml);
+    	editorPane.setEditable(false);
+    	editorPane.setBackground(new javax.swing.JLabel().getBackground());
+
+    	// 包装到 JScrollPane
+    	JScrollPane scrollPane = new JScrollPane(editorPane);
+    	scrollPane.setPreferredSize(new Dimension(600, 500));
+
     	JOptionPane.showMessageDialog(this,
-    		helpHtml,
+    		scrollPane,
     		"使用说明",
     		JOptionPane.INFORMATION_MESSAGE);
     }
@@ -525,8 +538,30 @@ public class FileExplorerWindow extends JFrame {
     		</html>
     		""", primaryColor, secondaryTextColor, textColor, version, textColor, primaryColor);
 
+    	// 创建 JEditorPane 并设置 HTML 内容
+    	JEditorPane editorPane = new JEditorPane("text/html", aboutHtml);
+    	editorPane.setEditable(false);
+    	editorPane.setBackground(new javax.swing.JLabel().getBackground());
+
+    	// 添加超链接监听器（支持 GitHub 链接点击）
+    	editorPane.addHyperlinkListener(new HyperlinkListener() {
+    		@Override
+    		public void hyperlinkUpdate(HyperlinkEvent e) {
+    			if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
+    				try {
+    					Desktop.getDesktop().browse(e.getURL().toURI());
+    				} catch (Exception ex) {
+    					ex.printStackTrace();
+    				}
+    			}
+    		}
+    	});
+
+    	JScrollPane scrollPane = new JScrollPane(editorPane);
+    	scrollPane.setPreferredSize(new Dimension(500, 300));
+
     	JOptionPane.showMessageDialog(this,
-    		aboutHtml,
+    		scrollPane,
     		"关于",
     		JOptionPane.INFORMATION_MESSAGE);
     }
