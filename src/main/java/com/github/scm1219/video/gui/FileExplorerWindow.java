@@ -37,6 +37,7 @@ import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
+import javax.swing.UIManager;
 import javax.swing.JTextField;
 import javax.swing.JTree;
 import javax.swing.ScrollPaneLayout;
@@ -491,7 +492,7 @@ public class FileExplorerWindow extends JFrame {
     	// 创建 JEditorPane 并设置 HTML 内容
     	JEditorPane editorPane = new JEditorPane("text/html", helpHtml);
     	editorPane.setEditable(false);
-    	editorPane.setBackground(new javax.swing.JLabel().getBackground());
+    	editorPane.setBackground(UIManager.getColor("Panel.background"));
 
     	// 包装到 JScrollPane
     	JScrollPane scrollPane = new JScrollPane(editorPane);
@@ -541,7 +542,7 @@ public class FileExplorerWindow extends JFrame {
     	// 创建 JEditorPane 并设置 HTML 内容
     	JEditorPane editorPane = new JEditorPane("text/html", aboutHtml);
     	editorPane.setEditable(false);
-    	editorPane.setBackground(new javax.swing.JLabel().getBackground());
+    	editorPane.setBackground(UIManager.getColor("Panel.background"));
 
     	// 添加超链接监听器（支持 GitHub 链接点击）
     	editorPane.addHyperlinkListener(new HyperlinkListener() {
@@ -551,6 +552,11 @@ public class FileExplorerWindow extends JFrame {
     				try {
     					Desktop.getDesktop().browse(e.getURL().toURI());
     				} catch (Exception ex) {
+    					// 用户友好的错误提示
+    					JOptionPane.showMessageDialog(FileExplorerWindow.this,
+    							"无法打开浏览器，请手动访问：\n" + e.getURL(),
+    							"错误",
+    							JOptionPane.ERROR_MESSAGE);
     					ex.printStackTrace();
     				}
     			}
@@ -575,18 +581,21 @@ public class FileExplorerWindow extends JFrame {
     	if (success) {
     		// 刷新所有组件的 UI
     		ThemeManager.updateUI();
+    		updateIndexInfo();
     		// 显示切换成功提示
     		JOptionPane.showMessageDialog(this,
     			"已切换到" + ThemeManager.getThemeDisplayName(themeName),
     			"主题切换",
     			JOptionPane.INFORMATION_MESSAGE);
     	} else {
+    		
     		// 显示切换失败提示
     		JOptionPane.showMessageDialog(this,
     			"主题切换失败，请查看控制台日志",
     			"错误",
     			JOptionPane.ERROR_MESSAGE);
     	}
+    	
     }
 
     public static final Comparator<File> FILE_COMPARATOR= new Comparator<File>() {
@@ -721,7 +730,7 @@ public class FileExplorerWindow extends JFrame {
     private void updateIndexInfo() {
     	StringBuilder info = new StringBuilder();
     	info.append("<html><body style='padding: 10px; font-family: sans-serif;'>");
-    	info.append("<h3 style='margin-top: 0; color: #333;'>索引信息</h3>");
+    	info.append("<h3 style='margin-top: 0; color: "+ThemeManager.getPrimaryColor()+";'>索引信息</h3>");
     	
     	List<Disk> disks = DiskManager.getInstance().listDisk();
     	info.append("<p><strong>索引磁盘数量:</strong> ").append(disks.size()).append("</p>");
@@ -739,7 +748,7 @@ public class FileExplorerWindow extends JFrame {
     		info.append("</ul>");
     	}
     	
-    	info.append("<p style='color: #666; '>提示: 双击视频文件可直接播放</p>");
+    	info.append("<p style='color: "+ThemeManager.getSecondaryTextColor()+"; '>提示: 双击视频文件可直接播放</p>");
     	info.append("</body></html>");
     	
     	pnlIndexInfo.removeAll();
