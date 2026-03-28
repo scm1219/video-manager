@@ -550,7 +550,15 @@ public class Index {
 			try {
 				activeConnection = getConnection();
 
-				// 步骤3：开始事务
+				// 步骤3：DDL 操作（确保表和索引存在，使用幂等 SQL）
+				try(Statement stmt = activeConnection.createStatement()) {
+					activeConnection.setAutoCommit(true);
+					stmt.executeUpdate("create table if not exists files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
+					stmt.executeUpdate("create index if not exists idx_filename on files (fileName)");
+					stmt.executeUpdate("create index if not exists idx_dirname on files (dirName)");
+				}
+
+				// 步骤4：开始事务
 				activeConnection.setAutoCommit(false);
 			} catch (Exception e) {
 				log.error("获取数据库连接或设置事务失败", e);
