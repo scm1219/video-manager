@@ -27,6 +27,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 磁盘对应的索引
+ * 
  * @author scm12
  *
  */
@@ -34,12 +35,11 @@ import lombok.extern.slf4j.Slf4j;
 @ToString
 public class Index {
 
-
 	private File indexFile;
 
-	private boolean exists =false;
+	private boolean exists = false;
 
-	boolean isIndexing=false;
+	boolean isIndexing = false;
 
 	/**
 	 * 备份文件引用（用于取消索引时的回滚）
@@ -65,10 +65,10 @@ public class Index {
 	 * 索引统计信息
 	 */
 	public static class IndexStatistics {
-		private int totalCount;      // 扫描文件总数
-		private int addedCount;      // 新增文件数
-		private int deletedCount;    // 删除记录数
-		private long scanTime;       // 扫描耗时(ms)
+		private int totalCount; // 扫描文件总数
+		private int addedCount; // 新增文件数
+		private int deletedCount; // 删除记录数
+		private long scanTime; // 扫描耗时(ms)
 
 		public IndexStatistics() {
 		}
@@ -114,6 +114,7 @@ public class Index {
 
 		/**
 		 * 格式化输出用于UI显示
+		 * 
 		 * @return 格式化的统计信息字符串
 		 */
 		public String toFormattedString() {
@@ -130,36 +131,40 @@ public class Index {
 					totalCount, addedCount, deletedCount, scanTime);
 		}
 	}
-	
+
 	public Index(File indexFile) {
 		this.indexFile = indexFile;
-		exists = indexFile.exists() && indexFile.length()>0;
-		
-		//数据库链接预初始化
-		if(exists) {
+		exists = indexFile.exists() && indexFile.length() > 0;
+
+		// 数据库链接预初始化
+		if (exists) {
 			new Thread(new Runnable() {
 				@Override
 				public void run() {
-					try(Connection conn =getConnection()){
+					try (Connection conn = getConnection()) {
 						conn.createStatement().executeQuery("select 1");
 						String rootDrive = indexFile.getAbsolutePath().split(":")[0] + ":";
 						log.debug(rootDrive + "\\ sqlite数据库链接正常");
-					}catch (Exception e) {
+					} catch (Exception e) {
 						e.printStackTrace();
 					}
 				}
 			}).start();
 		}
 	}
-	
+
 	private Connection getConnection() throws Exception {
-		return DriverManager.getConnection("jdbc:sqlite:"+indexFile.getAbsolutePath());
+		return DriverManager.getConnection("jdbc:sqlite:" + indexFile.getAbsolutePath());
 	}
 
 	/**
 	 * 创建索引文件的备份
-	 * <p>在索引开始前调用，备份原索引文件以便取消时回滚</p>
-	 * <p>异常在方法内部处理，如果备份失败将记录日志并设置 backupFile 为 null</p>
+	 * <p>
+	 * 在索引开始前调用，备份原索引文件以便取消时回滚
+	 * </p>
+	 * <p>
+	 * 异常在方法内部处理，如果备份失败将记录日志并设置 backupFile 为 null
+	 * </p>
 	 */
 	private void createBackup() {
 		try {
@@ -180,7 +185,9 @@ public class Index {
 
 	/**
 	 * 清理备份文件
-	 * <p>在索引正常结束或回滚完成后调用</p>
+	 * <p>
+	 * 在索引正常结束或回滚完成后调用
+	 * </p>
 	 */
 	private void cleanupBackup() {
 		if (backupFile != null && backupFile.exists()) {
@@ -195,7 +202,9 @@ public class Index {
 
 	/**
 	 * 处理索引取消操作（双重保障回滚）
-	 * <p>先尝试 SQLite 事务回滚，失败时使用备份文件回滚</p>
+	 * <p>
+	 * 先尝试 SQLite 事务回滚，失败时使用备份文件回滚
+	 * </p>
 	 */
 	private synchronized void handleCancel() {
 		boolean rollbackSuccess = false;
@@ -252,14 +261,15 @@ public class Index {
 
 	/**
 	 * 带进度条的处理
+	 * 
 	 * @param disk
 	 * @param bar
 	 */
-	public void create(Disk disk,JProgressBar bar) {
-		if(bar!=null) {
+	public void create(Disk disk, JProgressBar bar) {
+		if (bar != null) {
 			bar.setString("开始收集要处理的文件夹");
 		}
-		log.info("对"+indexFile.getParent()+"创建缓存");
+		log.info("对" + indexFile.getParent() + "创建缓存");
 
 		try {
 			// 步骤1：创建备份
@@ -269,10 +279,11 @@ public class Index {
 			activeConnection = getConnection();
 
 			// 步骤3：DDL 操作（在自动提交模式下，使用幂等 SQL）
-			try(Statement stmt = activeConnection.createStatement()){
+			try (Statement stmt = activeConnection.createStatement()) {
 				activeConnection.setAutoCommit(true);
-				if(!indexFile.exists() || indexFile.length() < 1) {
-					stmt.executeUpdate("create table if not exists files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
+				if (!indexFile.exists() || indexFile.length() < 1) {
+					stmt.executeUpdate(
+							"create table if not exists files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
 					stmt.executeUpdate("create index if not exists idx_filename on files (fileName)");
 					stmt.executeUpdate("create index if not exists idx_dirname on files (dirName)");
 				}
@@ -283,7 +294,7 @@ public class Index {
 
 			try {
 				// 删除旧数据
-				try(Statement stmt = activeConnection.createStatement()) {
+				try (Statement stmt = activeConnection.createStatement()) {
 					stmt.execute("delete from files");
 				}
 
@@ -302,7 +313,8 @@ public class Index {
 				int totalCount = dirs.size();
 				int processedCount = 0;
 
-				try(PreparedStatement pstmt = activeConnection.prepareStatement("insert into files (fileName,dirName,filePath,dirPath) values (?,?,?,?)")){
+				try (PreparedStatement pstmt = activeConnection
+						.prepareStatement("insert into files (fileName,dirName,filePath,dirPath) values (?,?,?,?)")) {
 					int count = 0;
 					for (File file : dirs) {
 						// 每个目录检查取消
@@ -310,30 +322,32 @@ public class Index {
 
 						log.info(file.toString());
 						processedCount++;
-						int num = processedCount*100/totalCount;
-						if(bar!=null) {
+						int num = processedCount * 100 / totalCount;
+						if (bar != null) {
 							bar.setValue(num);
-							bar.setString("正在处理"+file.toString());
+							bar.setString("正在处理" + file.toString());
 						}
 
 						File[] videoFiles = file.listFiles(new VideoFileFilter());
 						String dirName = file.getName();
 						for (File videoFile : videoFiles) {
-							pstmt.setString(1,getString(videoFile.getName()));
+							pstmt.setString(1, getString(videoFile.getName()));
 							pstmt.setString(2, getString(dirName));
-							pstmt.setString(3, videoFile.getAbsolutePath().substring(videoFile.getAbsolutePath().indexOf(":")+1));
-							pstmt.setString(4, videoFile.getParentFile().getAbsolutePath().substring(videoFile.getAbsolutePath().indexOf(":")+1));
+							pstmt.setString(3, videoFile.getAbsolutePath()
+									.substring(videoFile.getAbsolutePath().indexOf(":") + 1));
+							pstmt.setString(4, videoFile.getParentFile().getAbsolutePath()
+									.substring(videoFile.getAbsolutePath().indexOf(":") + 1));
 							pstmt.addBatch();
 							count++;
-							if(count>100) {
+							if (count > 100) {
 								pstmt.executeBatch();
-								count=0;
+								count = 0;
 								// 每100条记录检查取消
 								checkCancelled();
 							}
 						}
 					}
-					if(count>0) {
+					if (count > 0) {
 						pstmt.executeBatch();
 					}
 				}
@@ -344,7 +358,7 @@ public class Index {
 
 				log.info("整盘索引完成，共扫描 {} 个文件", scannedFileCount);
 
-				if(bar!=null) {
+				if (bar != null) {
 					bar.setString("处理结束");
 				}
 
@@ -373,12 +387,12 @@ public class Index {
 
 		} catch (IndexCancelledException e) {
 			// 取消异常已在上面处理，这里仅记录日志
-			if(bar!=null) {
+			if (bar != null) {
 				bar.setString("索引已取消");
 			}
 		} catch (Exception e) {
 			log.error("创建索引失败", e);
-			if(bar!=null) {
+			if (bar != null) {
 				bar.setString("处理失败: " + e.getMessage());
 			}
 		} finally {
@@ -393,101 +407,105 @@ public class Index {
 			}
 		}
 	}
+
 	public synchronized boolean isIndexing() {
 		return isIndexing;
 	}
 
 	/**
 	 * 检查是否已请求取消
-	 * <p>供外部类（如 Disk）在耗时操作中检查取消状态</p>
+	 * <p>
+	 * 供外部类（如 Disk）在耗时操作中检查取消状态
+	 * </p>
 	 *
 	 * @return true 如果已请求取消，false 否则
 	 */
 	public boolean isCancelled() {
 		return isCancelled;
 	}
+
 	public void create(Disk disk) {
-		if(isIndexing) {
+		if (isIndexing) {
 			throw new RuntimeException("索引正在创建中，请稍后");
-		}else {
-			isIndexing=true;
+		} else {
+			isIndexing = true;
 			try {
 				create(disk, null);
 			} catch (Exception e) {
-				JOptionPane.showMessageDialog(null, "创建索引出错："+e.getLocalizedMessage());
+				JOptionPane.showMessageDialog(null, "创建索引出错：" + e.getLocalizedMessage());
 			}
-			isIndexing=false;
+			isIndexing = false;
 		}
 	}
-	
+
 	public void cancel(Disk disk) {
 		isCancelled = true;
 		log.info("用户请求取消索引创建");
 
 	}
-	
+
 	private static String getString(String data) {
-		if(org.apache.commons.lang3.StringUtils.isNotEmpty(data)) {
-			String result  = data.toLowerCase();
+		if (org.apache.commons.lang3.StringUtils.isNotEmpty(data)) {
+			String result = data.toLowerCase();
 			result = ZhConverterUtil.toSimple(result);
 			return result;
-		}else {
+		} else {
 			return data;
 		}
 	}
-	
+
 	public List<File> findFiles(String name) {
 		List<File> results = new ArrayList<>();
-		//当前盘符
+		// 当前盘符
 		name = getString(name);
 		String currentDrive = indexFile.getAbsolutePath().split(":")[0];
-		try(Connection conn =getConnection()){
-			String sql = "select filePath from files where fileName like '%"+name+"%'";
-			try(Statement stmt = conn.createStatement()){
+		try (Connection conn = getConnection()) {
+			String sql = "select filePath from files where fileName like '%" + name + "%'";
+			try (Statement stmt = conn.createStatement()) {
 				ResultSet rs = stmt.executeQuery(sql);
-				while(rs.next()) {
+				while (rs.next()) {
 					String newPath = rs.getString(1);
-					File f = new File(currentDrive+":"+newPath);
+					File f = new File(currentDrive + ":" + newPath);
 					results.add(f);
 				}
 			}
-		}catch (Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return results;
 	}
-	
+
 	public List<File> findDirs(String dirName) {
 		List<File> results = new ArrayList<>();
-		//当前盘符
+		// 当前盘符
 		dirName = getString(dirName);
 		String currentDrive = indexFile.getAbsolutePath().split(":")[0];
-		try(Connection conn =getConnection()){
-			String sql = "select distinct(dirPath) from files where dirName like '%"+dirName+"%'";
-			try(Statement stmt = conn.createStatement()){
+		try (Connection conn = getConnection()) {
+			String sql = "select distinct(dirPath) from files where dirName like '%" + dirName + "%'";
+			try (Statement stmt = conn.createStatement()) {
 				ResultSet rs = stmt.executeQuery(sql);
-				while(rs.next()) {
+				while (rs.next()) {
 					String newPath = rs.getString(1);
-					File f = new File(currentDrive+":"+newPath);
+					File f = new File(currentDrive + ":" + newPath);
 					results.add(f);
 				}
 			}
-		}catch (Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return results;
 	}
-	
-	
+
 	public boolean exists() {
 		return exists;
 	}
 
 	public void initEmptyTables() {
-		try(Connection connection=getConnection()) {
+		try (Connection connection = getConnection()) {
 			connection.setAutoCommit(true);
-			try(Statement stmt = connection.createStatement()){
-				stmt.executeUpdate("create table files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
+			try (Statement stmt = connection.createStatement()) {
+				stmt.executeUpdate(
+						"create table files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
 				stmt.executeUpdate("create index idx_filename on files (fileName)");
 				stmt.executeUpdate("create index idx_dirname on files (dirName)");
 				stmt.executeQuery("select count(*) from files");
@@ -499,30 +517,30 @@ public class Index {
 
 	public String getInfoString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("位置："+indexFile.getParent());
+		sb.append("位置：" + indexFile.getParent());
 		sb.append("\n");
-		sb.append("文件名："+indexFile.getName());
+		sb.append("文件名：" + indexFile.getName());
 		sb.append("\n");
-		sb.append("索引大小："+FileUtils.formetFileSize(indexFile.length()));
+		sb.append("索引大小：" + FileUtils.formetFileSize(indexFile.length()));
 		sb.append("\n");
-		sb.append("修改时间："+ DateUtils.getDateString(indexFile.lastModified()));
+		sb.append("修改时间：" + DateUtils.getDateString(indexFile.lastModified()));
 		sb.append("\n");
-		sb.append("包含记录条数："+getRecordsCount());
+		sb.append("包含记录条数：" + getRecordsCount());
 		sb.append("\n");
 		return sb.toString();
 	}
-	
+
 	private long getRecordsCount() {
-		long count =0L;
-		try(Connection conn = getConnection()){
-			String sql ="select count(*) from files";
-			try(Statement stmt = conn.createStatement()){
+		long count = 0L;
+		try (Connection conn = getConnection()) {
+			String sql = "select count(*) from files";
+			try (Statement stmt = conn.createStatement()) {
 				ResultSet rs = stmt.executeQuery(sql);
-				while(rs.next()) {
-					count =rs.getLong(1);
+				while (rs.next()) {
+					count = rs.getLong(1);
 				}
 			}
-		}catch (Exception e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
 		return count;
@@ -530,14 +548,15 @@ public class Index {
 
 	/**
 	 * 为指定目录创建索引（先删除旧记录，再扫描并插入新记录）
+	 * 
 	 * @param directory 要扫描的目录
-	 * @param bar 进度条（可为null）
+	 * @param bar       进度条（可为null）
 	 * @return 索引统计信息
 	 */
 	public IndexStatistics createForDirectory(File directory, JProgressBar bar) {
 		long startTime = System.currentTimeMillis();
 		IndexStatistics stats = new IndexStatistics();
-		if(bar!=null) {
+		if (bar != null) {
 			bar.setString("开始扫描目录: " + directory.getName());
 		}
 		log.info("为目录{}创建索引", directory.getAbsolutePath());
@@ -551,9 +570,10 @@ public class Index {
 				activeConnection = getConnection();
 
 				// 步骤3：DDL 操作（确保表和索引存在，使用幂等 SQL）
-				try(Statement stmt = activeConnection.createStatement()) {
+				try (Statement stmt = activeConnection.createStatement()) {
 					activeConnection.setAutoCommit(true);
-					stmt.executeUpdate("create table if not exists files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
+					stmt.executeUpdate(
+							"create table if not exists files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
 					stmt.executeUpdate("create index if not exists idx_filename on files (fileName)");
 					stmt.executeUpdate("create index if not exists idx_dirname on files (dirName)");
 				}
@@ -570,28 +590,27 @@ public class Index {
 			try {
 				// 获取目录路径（去掉盘符，统一格式）
 				String dirPath = directory.getAbsolutePath();
-				if(dirPath.contains(":")) {
+				if (dirPath.contains(":")) {
 					dirPath = dirPath.substring(dirPath.indexOf(":") + 1);
 				}
 				// 确保路径以/开头
-				if(!dirPath.startsWith("/") && !dirPath.startsWith("\\")) {
+				if (!dirPath.startsWith("/") && !dirPath.startsWith("\\")) {
 					dirPath = "/" + dirPath;
 				}
 				// 统一使用/作为路径分隔符
 				dirPath = dirPath.replace("\\", "/");
 
-				if(bar!=null) {
+				if (bar != null) {
 					bar.setString("删除旧索引记录...");
 				}
-				
 
 				// 统计删除前的记录数
 				int deletedCount = 0;
-				try(Statement stmt = activeConnection.createStatement()) {
+				try (Statement stmt = activeConnection.createStatement()) {
 					String countSql = "SELECT COUNT(*) FROM files WHERE dirPath LIKE '" + dirPath + "%'";
 					log.debug("执行统计SQL: {}", countSql);
 					ResultSet rs = stmt.executeQuery(countSql);
-					if(rs.next()) {
+					if (rs.next()) {
 						deletedCount = rs.getInt(1);
 					}
 				}
@@ -599,7 +618,7 @@ public class Index {
 				stats.setDeletedCount(deletedCount);
 
 				// 删除该目录下的所有旧记录
-				try(Statement stmt = activeConnection.createStatement()) {
+				try (Statement stmt = activeConnection.createStatement()) {
 					String deleteSql = "DELETE FROM files WHERE dirPath LIKE '" + dirPath + "%'";
 					log.debug("执行删除SQL: {}", deleteSql);
 					stmt.executeUpdate(deleteSql);
@@ -608,7 +627,7 @@ public class Index {
 				// 检查取消
 				checkCancelled();
 
-				if(bar!=null) {
+				if (bar != null) {
 					bar.setString("扫描视频文件...");
 				}
 
@@ -625,27 +644,29 @@ public class Index {
 				log.info("扫描完成，共扫描 {} 个文件，找到 {} 个视频文件",
 						scannedFileCount, videoFiles.size());
 
-				if(bar!=null) {
+				if (bar != null) {
 					bar.setValue(50);
 					bar.setString("插入索引记录...");
 				}
 
 				// 批量插入视频文件记录
-				try(PreparedStatement pstmt = activeConnection.prepareStatement(
+				try (PreparedStatement pstmt = activeConnection.prepareStatement(
 						"INSERT INTO files (fileName, dirName, filePath, dirPath) VALUES (?, ?, ?, ?)")) {
 
 					int count = 0;
 					int totalFiles = videoFiles.size();
 					int processedFiles = 0;
 
-					for(File videoFile : videoFiles) {
+					for (File videoFile : videoFiles) {
 						log.debug("处理文件: {}", videoFile.getAbsolutePath());
 
 						String fileName = getString(videoFile.getName());
 						File parentDir = videoFile.getParentFile();
 						String dirName = getString(parentDir.getName());
-						String filePath = videoFile.getAbsolutePath().substring(videoFile.getAbsolutePath().indexOf(":") + 1);
-						String fileDirPath = parentDir.getAbsolutePath().substring(parentDir.getAbsolutePath().indexOf(":") + 1);
+						String filePath = videoFile.getAbsolutePath()
+								.substring(videoFile.getAbsolutePath().indexOf(":") + 1);
+						String fileDirPath = parentDir.getAbsolutePath()
+								.substring(parentDir.getAbsolutePath().indexOf(":") + 1);
 						// 统一路径分隔符
 						filePath = filePath.replace("\\", "/");
 						fileDirPath = fileDirPath.replace("\\", "/");
@@ -658,14 +679,14 @@ public class Index {
 
 						// 更新进度
 						processedFiles++;
-						if(bar!=null && totalFiles > 0) {
+						if (bar != null && totalFiles > 0) {
 							int progress = 50 + (processedFiles * 50 / totalFiles);
 							bar.setValue(progress);
 							bar.setString("正在处理 " + processedFiles + "/" + totalFiles);
 						}
 
 						// 每100条执行一次批量插入
-						if(count >= 100) {
+						if (count >= 100) {
 							pstmt.executeBatch();
 							count = 0;
 							// 每100条记录检查取消
@@ -674,7 +695,7 @@ public class Index {
 					}
 
 					// 插入剩余记录
-					if(count > 0) {
+					if (count > 0) {
 						pstmt.executeBatch();
 					}
 				}
@@ -683,7 +704,7 @@ public class Index {
 				activeConnection.commit();
 				activeConnection.setAutoCommit(true);
 
-				if(bar!=null) {
+				if (bar != null) {
 					bar.setValue(100);
 					bar.setString("扫描完成！共处理 " + videoFiles.size() + " 个视频文件");
 				}
@@ -722,7 +743,7 @@ public class Index {
 
 		} catch (IndexCancelledException e) {
 			// 取消异常已在上面处理
-			if(bar!=null) {
+			if (bar != null) {
 				bar.setString("索引已取消");
 			}
 			return stats;
@@ -744,33 +765,34 @@ public class Index {
 
 	/**
 	 * 递归收集目录下的所有视频文件
+	 * 
 	 * @param directory 要扫描的目录
-	 * @param result 结果列表
-	 * @param bar 进度条（可为null）
+	 * @param result    结果列表
+	 * @param bar       进度条（可为null）
 	 */
 	private void collectVideoFiles(File directory, List<File> result, JProgressBar bar) {
-		if(!directory.exists() || !directory.isDirectory()) {
+		if (!directory.exists() || !directory.isDirectory()) {
 			return;
 		}
 
 		File[] files = directory.listFiles();
-		if(files == null) {
+		if (files == null) {
 			return;
 		}
 
-		for(File file : files) {
+		for (File file : files) {
 			// 每处理一个文件都增加扫描计数
 			scannedFileCount++;
 
 			// 每100个文件检查一次取消
-			if(scannedFileCount % 100 == 0) {
+			if (scannedFileCount % 100 == 0) {
 				checkCancelled();
 			}
 
-			if(file.isDirectory()) {
+			if (file.isDirectory()) {
 				// 递归处理子目录
 				collectVideoFiles(file, result, bar);
-			} else if(FileUtils.isVideoFile(file)) {
+			} else if (FileUtils.isVideoFile(file)) {
 				result.add(file);
 			}
 		}
@@ -778,8 +800,10 @@ public class Index {
 
 	/**
 	 * 验证并清理索引中的无效记录（文件已不存在的记录）
-	 * <p>此方法会遍历索引中的所有记录，检查对应的文件是否真实存在，
-	 * 删除那些文件已被移除或删除的索引记录。</p>
+	 * <p>
+	 * 此方法会遍历索引中的所有记录，检查对应的文件是否真实存在，
+	 * 删除那些文件已被移除或删除的索引记录。
+	 * </p>
 	 *
 	 * @param bar 进度条（可为null）
 	 * @return 清理统计信息
@@ -788,7 +812,7 @@ public class Index {
 		long startTime = System.currentTimeMillis();
 		IndexStatistics stats = new IndexStatistics();
 
-		if(bar != null) {
+		if (bar != null) {
 			bar.setString("开始验证索引...");
 		}
 		log.info("开始验证索引，检查无效记录");
@@ -798,7 +822,7 @@ public class Index {
 			String currentDrive = indexFile.getAbsolutePath().split(":")[0];
 
 			// 获取数据库连接
-			try(Connection conn = getConnection()) {
+			try (Connection conn = getConnection()) {
 				conn.setAutoCommit(false);
 
 				try {
@@ -807,14 +831,14 @@ public class Index {
 					int totalRecords = 0;
 					int checkedCount = 0;
 
-					if(bar != null) {
+					if (bar != null) {
 						bar.setString("正在读取索引记录...");
 					}
 
 					// 先获取总记录数
-					try(Statement stmt = conn.createStatement()) {
+					try (Statement stmt = conn.createStatement()) {
 						ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM files");
-						if(rs.next()) {
+						if (rs.next()) {
 							totalRecords = rs.getInt(1);
 						}
 					}
@@ -822,8 +846,8 @@ public class Index {
 					stats.setTotalCount(totalRecords);
 					log.info("索引中共有 {} 条记录需要验证", totalRecords);
 
-					if(totalRecords == 0) {
-						if(bar != null) {
+					if (totalRecords == 0) {
+						if (bar != null) {
 							bar.setString("索引为空，无需清理");
 						}
 						stats.setScanTime(System.currentTimeMillis() - startTime);
@@ -832,10 +856,10 @@ public class Index {
 
 					// 查询所有文件路径
 					String sql = "SELECT filePath FROM files";
-					try(Statement stmt = conn.createStatement();
-						ResultSet rs = stmt.executeQuery(sql)) {
+					try (Statement stmt = conn.createStatement();
+							ResultSet rs = stmt.executeQuery(sql)) {
 
-						while(rs.next()) {
+						while (rs.next()) {
 							String filePath = rs.getString(1);
 							String fullPath = currentDrive + ":" + filePath;
 							File file = new File(fullPath);
@@ -843,45 +867,45 @@ public class Index {
 							checkedCount++;
 
 							// 更新进度
-							if(bar != null && totalRecords > 0) {
+							if (bar != null && totalRecords > 0) {
 								int progress = checkedCount * 100 / totalRecords;
 								bar.setValue(progress);
 								bar.setString("验证中 " + checkedCount + "/" + totalRecords);
 							}
 
 							// 检查文件是否存在
-							if(!file.exists()) {
+							if (!file.exists()) {
 								invalidPaths.add(filePath);
 								log.debug("发现无效记录: {}", fullPath);
 							}
 
 							// 每100条记录检查一次取消
-							if(checkedCount % 100 == 0) {
+							if (checkedCount % 100 == 0) {
 								checkCancelled();
 							}
 						}
 					}
 
 					// 步骤2：删除无效记录
-					if(!invalidPaths.isEmpty()) {
-						if(bar != null) {
+					if (!invalidPaths.isEmpty()) {
+						if (bar != null) {
 							bar.setString("删除 " + invalidPaths.size() + " 条无效记录...");
 						}
 
 						log.info("发现 {} 条无效记录，开始删除", invalidPaths.size());
 						stats.setDeletedCount(invalidPaths.size());
 
-						try(PreparedStatement pstmt = conn.prepareStatement(
+						try (PreparedStatement pstmt = conn.prepareStatement(
 								"DELETE FROM files WHERE filePath = ?")) {
 
 							int count = 0;
-							for(String invalidPath : invalidPaths) {
+							for (String invalidPath : invalidPaths) {
 								pstmt.setString(1, invalidPath);
 								pstmt.addBatch();
 								count++;
 
 								// 每100条执行一次批量删除
-								if(count >= 100) {
+								if (count >= 100) {
 									pstmt.executeBatch();
 									count = 0;
 									checkCancelled();
@@ -889,7 +913,7 @@ public class Index {
 							}
 
 							// 删除剩余记录
-							if(count > 0) {
+							if (count > 0) {
 								pstmt.executeBatch();
 							}
 						}
@@ -898,13 +922,13 @@ public class Index {
 						conn.commit();
 						log.info("成功删除 {} 条无效记录", invalidPaths.size());
 
-						if(bar != null) {
+						if (bar != null) {
 							bar.setValue(100);
 							bar.setString("清理完成！删除了 " + invalidPaths.size() + " 条无效记录");
 						}
 					} else {
 						log.info("未发现无效记录，索引完整");
-						if(bar != null) {
+						if (bar != null) {
 							bar.setValue(100);
 							bar.setString("验证完成！索引完整，无需清理");
 						}
@@ -927,7 +951,7 @@ public class Index {
 				} catch (Exception e) {
 					// 其他异常：回滚事务
 					try {
-						if(!conn.getAutoCommit()) {
+						if (!conn.getAutoCommit()) {
 							conn.rollback();
 							conn.setAutoCommit(true);
 						}
@@ -941,14 +965,14 @@ public class Index {
 
 		} catch (IndexCancelledException e) {
 			// 取消异常已在上面处理
-			if(bar != null) {
+			if (bar != null) {
 				bar.setString("验证已取消");
 			}
 			return stats;
 
 		} catch (Exception e) {
 			log.error("验证索引失败", e);
-			if(bar != null) {
+			if (bar != null) {
 				bar.setString("验证失败: " + e.getMessage());
 			}
 			throw new RuntimeException("验证索引失败: " + e.getMessage(), e);

@@ -12,36 +12,38 @@ import javax.swing.plaf.ColorUIResource;
 import javax.swing.tree.DefaultTreeCellRenderer;
 
 public class FileTreeCellRenderer extends DefaultTreeCellRenderer {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	// 颜色常量：避免重复创建Color对象，提高性能
-	private static final Color COLOR_SELECTION = new Color(51, 153, 255);
-	private static final Color COLOR_HOVER = Color.GRAY;
-	private static final Color COLOR_INDEXED = new Color(0, 170, 0);
-	private static final Color COLOR_UNINDEXED = new Color(153, 153, 153);
+    // 颜色常量：避免重复创建Color对象，提高性能
+    private static final Color COLOR_SELECTION = new Color(51, 153, 255);
+    private static final Color COLOR_HOVER = Color.GRAY;
+    private static final Color COLOR_INDEXED = new Color(0, 170, 0);
+    private static final Color COLOR_UNINDEXED = new Color(153, 153, 153);
 
-	public FileTreeCellRenderer() {
+    public FileTreeCellRenderer() {
     }
 
-	/**
-	 * 根据状态设置标签背景
-	 * @param label 目标标签
-	 * @param isSelected 是否选中
-	 * @param isHovered 是否悬停
-	 */
-	private void setBackgroundForState(JLabel label, boolean isSelected, boolean isHovered) {
-		label.setOpaque(false);
-		if (isSelected) {
-			label.setOpaque(true);
-			label.setBackground(COLOR_SELECTION);
-		} else if (isHovered) {
-			label.setOpaque(true);
-			label.setBackground(COLOR_HOVER);
-		}
-	}
+    /**
+     * 根据状态设置标签背景
+     * 
+     * @param label      目标标签
+     * @param isSelected 是否选中
+     * @param isHovered  是否悬停
+     */
+    private void setBackgroundForState(JLabel label, boolean isSelected, boolean isHovered) {
+        label.setOpaque(false);
+        if (isSelected) {
+            label.setOpaque(true);
+            label.setBackground(COLOR_SELECTION);
+        } else if (isHovered) {
+            label.setOpaque(true);
+            label.setBackground(COLOR_HOVER);
+        }
+    }
 
     @Override
-    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded, boolean leaf, int row, boolean hasFocus) {
+    public Component getTreeCellRendererComponent(JTree tree, Object value, boolean selected, boolean expanded,
+            boolean leaf, int row, boolean hasFocus) {
         FileTree fileTree = (FileTree) tree;
         FileTreeNode fileNode = (FileTreeNode) value;
 
@@ -80,7 +82,8 @@ public class FileTreeCellRenderer extends DefaultTreeCellRenderer {
             return panel;
         } else {
             // 非磁盘根节点：保持原有行为
-            JLabel label = (JLabel) super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus);
+            JLabel label = (JLabel) super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row,
+                    hasFocus);
             label.setText(fileName);
             label.setIcon(icon);
             setBackgroundForState(label, isSelected, isHovered);

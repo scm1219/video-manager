@@ -148,8 +148,8 @@ public class ThemeManager {
             // 回退到系统默认 Look and Feel
             try {
                 javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
-            } catch (ClassNotFoundException | InstantiationException |
-                     IllegalAccessException | UnsupportedLookAndFeelException ex) {
+            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+                    | UnsupportedLookAndFeelException ex) {
                 System.err.println("回退到系统主题失败: " + ex.getMessage());
             }
             return false;
@@ -170,7 +170,7 @@ public class ThemeManager {
      * @return 主题名称数组
      */
     public static String[] getAvailableThemes() {
-        return new String[]{THEME_LIGHT, THEME_DARK, THEME_AUTO};
+        return new String[] { THEME_LIGHT, THEME_DARK, THEME_AUTO };
     }
 
     /**
@@ -193,41 +193,44 @@ public class ThemeManager {
 
     /**
      * 获取当前主题的主色调颜色（用于标题）
+     * 
      * @return 十六进制颜色代码
      */
     public static String getPrimaryColor() {
-    	// 检测当前是否为深色主题
-    	boolean isDark = FlatLaf.isLafDark();
-    	if (isDark) {
-    		return "#64B5F6"; // 深色主题：浅蓝色
-    	} else {
-    		return "#1976D2"; // 浅色主题：深蓝色
-    	}
+        // 检测当前是否为深色主题
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#64B5F6"; // 深色主题：浅蓝色
+        } else {
+            return "#1976D2"; // 浅色主题：深蓝色
+        }
     }
 
     /**
      * 获取当前主题的文本颜色（用于小标题）
+     * 
      * @return 十六进制颜色代码
      */
     public static String getTextColor() {
-    	boolean isDark = FlatLaf.isLafDark();
-    	if (isDark) {
-    		return "#B0BEC5"; // 深色主题：浅灰色
-    	} else {
-    		return "#424242"; // 浅色主题：深灰色
-    	}
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#B0BEC5"; // 深色主题：浅灰色
+        } else {
+            return "#424242"; // 浅色主题：深灰色
+        }
     }
 
     /**
      * 获取当前主题的次要文本颜色（用于提示信息）
+     * 
      * @return 十六进制颜色代码
      */
     public static String getSecondaryTextColor() {
-    	boolean isDark = FlatLaf.isLafDark();
-    	if (isDark) {
-    		return "#90A4AE"; // 深色主题：中灰色
-    	} else {
-    		return "#666666"; // 浅色主题：中灰色
-    	}
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#90A4AE"; // 深色主题：中灰色
+        } else {
+            return "#666666"; // 浅色主题：中灰色
+        }
     }
 }

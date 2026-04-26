@@ -20,7 +20,9 @@ import com.github.scm1219.video.domain.IndexCancelledException;
 
 /**
  * 索引验证和清理进度窗口
- * <p>用于验证索引记录的有效性，并删除文件已不存在的无效记录</p>
+ * <p>
+ * 用于验证索引记录的有效性，并删除文件已不存在的无效记录
+ * </p>
  */
 public class IndexValidationProcesser extends JFrame {
 
@@ -37,6 +39,7 @@ public class IndexValidationProcesser extends JFrame {
 
 	/**
 	 * 构造函数
+	 * 
 	 * @param disk 要验证的磁盘对象
 	 */
 	public IndexValidationProcesser(Disk disk) {
@@ -66,12 +69,12 @@ public class IndexValidationProcesser extends JFrame {
 		button.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(button.getText().equals("开始验证")) {
+				if (button.getText().equals("开始验证")) {
 					// 启动验证线程
 					new ValidationThread(progressBar, button, disk).start();
-				} else if(button.getText().equals("关闭")) {
+				} else if (button.getText().equals("关闭")) {
 					frame.dispose();
-				} else if(button.getText().equals("取消")) {
+				} else if (button.getText().equals("取消")) {
 					// 二次确认
 					int confirm = javax.swing.JOptionPane.showConfirmDialog(frame,
 							"确定要取消验证吗？",
@@ -93,7 +96,7 @@ public class IndexValidationProcesser extends JFrame {
 
 		// 垂直布局
 		Box box = Box.createVerticalBox();
-		JComponent[] all = {label, progressBar, textArea, button};
+		JComponent[] all = { label, progressBar, textArea, button };
 		for (int i = 0; i < all.length; i++) {
 			Box tmp = Box.createHorizontalBox();
 			tmp.add(all[i]);
@@ -153,7 +156,7 @@ public class IndexValidationProcesser extends JFrame {
 				result.append("删除无效记录: ").append(stats.getDeletedCount()).append("\n");
 				result.append("总耗时: ").append(endTime - startTime).append(" ms\n");
 
-				if(stats.getDeletedCount() > 0) {
+				if (stats.getDeletedCount() > 0) {
 					result.append("\n已成功清理 ").append(stats.getDeletedCount()).append(" 条无效索引记录");
 				} else {
 					result.append("\n索引完整，无需清理");

@@ -20,7 +20,6 @@ import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.Index.IndexStatistics;
 import com.github.scm1219.video.domain.IndexCancelledException;
 
-
 public class FileUpdateProcesser extends JFrame {
 
 	private static final long serialVersionUID = 1L;
@@ -29,14 +28,15 @@ public class FileUpdateProcesser extends JFrame {
 	private JLabel label = new JLabel();
 	private JTextArea textArea = new JTextArea();
 
-	private static final int WINDOW_WITDH=400;
-	private static final int WINDOW_HEIGHT=300;
+	private static final int WINDOW_WITDH = 400;
+	private static final int WINDOW_HEIGHT = 300;
 
 	private File targetDirectory = null; // 目标目录，用于目录级索引
 	private Disk disk; // 磁盘对象
 
 	/**
 	 * 构造函数 - 用于整盘索引
+	 * 
 	 * @param disk 磁盘对象
 	 */
 	public FileUpdateProcesser(Disk disk) {
@@ -48,7 +48,8 @@ public class FileUpdateProcesser extends JFrame {
 
 	/**
 	 * 构造函数 - 用于目录级索引
-	 * @param disk 磁盘对象
+	 * 
+	 * @param disk      磁盘对象
 	 * @param directory 要扫描的目录
 	 */
 	public FileUpdateProcesser(Disk disk, File directory) {
@@ -73,21 +74,21 @@ public class FileUpdateProcesser extends JFrame {
 
 		label.setLocation(SwingConstants.CENTER, getDefaultCloseOperation());
 
-		//设置进度条的样式为不确定的进度条样式（进度条来回滚动），false为确定的进度条样式（即进度条从头到尾显示）
+		// 设置进度条的样式为不确定的进度条样式（进度条来回滚动），false为确定的进度条样式（即进度条从头到尾显示）
 		progressBar.setIndeterminate(false);
-		//设置进度条显示提示信息
+		// 设置进度条显示提示信息
 		progressBar.setStringPainted(true);
 
-		//给按钮添加事件监听器，点击按钮开始更新
+		// 给按钮添加事件监听器，点击按钮开始更新
 		button.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				if(button.getText().equals("开始")) {
+				if (button.getText().equals("开始")) {
 					// 使用线程更新
 					new Progress(progressBar, button, disk, targetDirectory).start();
-				}else if(button.getText().equals("关闭")) {
+				} else if (button.getText().equals("关闭")) {
 					frame.dispose();
-				}else if(button.getText().equals("取消")) {
+				} else if (button.getText().equals("取消")) {
 					// 二次确认
 					int confirm = javax.swing.JOptionPane.showConfirmDialog(frame,
 							"确定要取消索引创建吗？\n\n将恢复到索引前的状态，已扫描的数据将丢失。",
@@ -108,7 +109,7 @@ public class FileUpdateProcesser extends JFrame {
 		});
 
 		Box box = Box.createVerticalBox();
-		JComponent[] all= {label,progressBar,textArea,button};
+		JComponent[] all = { label, progressBar, textArea, button };
 		for (int i = 0; i < all.length; i++) {
 			Box tmp = Box.createHorizontalBox();
 			tmp.add(all[i]);
@@ -122,27 +123,27 @@ public class FileUpdateProcesser extends JFrame {
 	 * 更新窗口标题和标签文本（根据索引类型）
 	 */
 	private void updateLabels() {
-		if(targetDirectory == null) {
+		if (targetDirectory == null) {
 			// 整盘索引
 			setTitle("更新索引");
-			label.setText("更新"+disk.getPath()+"下的索引");
-			progressBar.setString("准备更新目录"+disk.getPath());
+			label.setText("更新" + disk.getPath() + "下的索引");
+			progressBar.setString("准备更新目录" + disk.getPath());
 		} else {
 			// 目录级索引
 			setTitle("扫描目录");
-			label.setText("扫描目录: "+targetDirectory.getAbsolutePath());
-			progressBar.setString("准备扫描目录: "+targetDirectory.getName());
+			label.setText("扫描目录: " + targetDirectory.getAbsolutePath());
+			progressBar.setString("准备扫描目录: " + targetDirectory.getName());
 		}
 	}
 
-	class Progress extends Thread{
+	class Progress extends Thread {
 
 		private JProgressBar bar;
 		private JButton button;
 		private Disk disk;
 		private File targetDirectory;
 
-		public Progress(JProgressBar progressBar, JButton button,Disk disk) {
+		public Progress(JProgressBar progressBar, JButton button, Disk disk) {
 			this.bar = progressBar;
 			this.button = button;
 			this.disk = disk;
@@ -158,34 +159,34 @@ public class FileUpdateProcesser extends JFrame {
 
 		public void run() {
 			textArea.setText("");
-			//开始更新后设置按钮为可点击的取消按钮
+			// 开始更新后设置按钮为可点击的取消按钮
 			button.setEnabled(true);
 			button.setText("取消");
 			bar.setStringPainted(true);
-			//采用确定的进度条样式
+			// 采用确定的进度条样式
 			bar.setIndeterminate(false);
 			long t1 = System.currentTimeMillis();
 
 			try {
 				// 根据是否有目标目录选择不同的索引方法
-				if(targetDirectory == null) {
+				if (targetDirectory == null) {
 					// 整盘索引
-					disk.getIndex().create(disk,bar);
+					disk.getIndex().create(disk, bar);
 				} else {
 					// 目录级索引
 					IndexStatistics stats = disk.getIndex().createForDirectory(targetDirectory, bar);
 					long t2 = System.currentTimeMillis();
-					bar.setString("扫描完成，耗时："+(t2-t1)+"ms\n");
+					bar.setString("扫描完成，耗时：" + (t2 - t1) + "ms\n");
 					textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n" +
-								   "状态: 扫描完成\n" +
-								   stats.toFormattedString() +
-								   "总耗时: " + (t2-t1) + "ms");
+							"状态: 扫描完成\n" +
+							stats.toFormattedString() +
+							"总耗时: " + (t2 - t1) + "ms");
 				}
 
 				long t2 = System.currentTimeMillis();
 
-				if(targetDirectory == null) {
-					bar.setString("索引创建完成，耗时："+(t2-t1)+"ms\n");
+				if (targetDirectory == null) {
+					bar.setString("索引创建完成，耗时：" + (t2 - t1) + "ms\n");
 					textArea.setText(disk.getIndex().getInfoString());
 				}
 
@@ -210,5 +211,5 @@ public class FileUpdateProcesser extends JFrame {
 		}
 
 	}
-	
+
 }

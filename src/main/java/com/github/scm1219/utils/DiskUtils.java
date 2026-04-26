@@ -9,29 +9,29 @@ import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.SmartInfo;
 
 public class DiskUtils {
-	
+
 	public static String getSmartInfo(Disk disk) {
-		
+
 		try {
 			ProcessBuilder processBuilder = new ProcessBuilder("smartctl.exe", "-d", "ata", "-A", disk.getVolumeName());
 			Process process = processBuilder.start();
 			BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
-			
+
 			String line = null;
 			StringBuffer b = new StringBuffer();
-			boolean start=false;
+			boolean start = false;
 			while ((line = br.readLine()) != null) {
-				if(start && StringUtils.isNoneBlank(line)) {
+				if (start && StringUtils.isNoneBlank(line)) {
 					SmartInfo smart = SmartInfo.parseFromSmartCtl(line);
 					String data = smart.getSimpleSmartInfo();
-					if(StringUtils.isBlank(data)) {
+					if (StringUtils.isBlank(data)) {
 						b.append(line + "\n");
-					}else {
+					} else {
 						b.append(data + "\n");
 					}
 				}
-				if(!start && line.startsWith("ID#")) {
-					start=true;
+				if (!start && line.startsWith("ID#")) {
+					start = true;
 				}
 			}
 			return b.toString();
@@ -40,6 +40,5 @@ public class DiskUtils {
 		}
 		return "无法获取SMART数据";
 	}
-	
-	
+
 }

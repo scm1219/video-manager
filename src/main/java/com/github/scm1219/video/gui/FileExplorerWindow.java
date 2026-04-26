@@ -105,6 +105,7 @@ public class FileExplorerWindow extends JFrame {
     private JPopupMenu menu = new JPopupMenu();
     private JMenuItem mNavigateTo;
     private JMenuItem mScanDirectory;
+    private JMenuItem mRenameToSimple;
     private javax.swing.JLabel lblStatusBar;  // 状态栏标签
     private JRadioButtonMenuItem themeLightMenuItem;
     private JRadioButtonMenuItem themeDarkMenuItem;
@@ -287,6 +288,48 @@ public class FileExplorerWindow extends JFrame {
                         "错误",
                         JOptionPane.ERROR_MESSAGE);
                 }
+			}
+		});
+
+		// 新增：文件夹名转简体菜单项
+		mRenameToSimple = new JMenuItem("文件夹名转简体");
+		menu.add(mRenameToSimple);
+		mRenameToSimple.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				FileTable fileTable = (FileTable)menu.getInvoker();
+				int row = fileTable.getSelectedRow();
+				File file = (File) fileTable.getValueAt(row, 0);
+
+				if (!file.isDirectory()) return;
+
+				String oldName = file.getName();
+				String newName = com.github.houbb.opencc4j.util.ZhConverterUtil.toSimple(oldName);
+
+				if (newName.equals(oldName)) {
+					JOptionPane.showMessageDialog(FileExplorerWindow.this,
+						"文件夹名已经是简体中文，无需转换",
+						"提示", JOptionPane.INFORMATION_MESSAGE);
+					return;
+				}
+
+				int confirm = JOptionPane.showConfirmDialog(FileExplorerWindow.this,
+					"将文件夹重命名：\n\"" + oldName + "\"\n→ \"" + newName + "\"",
+					"确认重命名", JOptionPane.YES_NO_OPTION);
+
+				if (confirm != JOptionPane.YES_OPTION) return;
+
+				File newFile = new File(file.getParentFile(), newName);
+				if (file.renameTo(newFile)) {
+					IconCache.clear();
+					if (currentDir != null) {
+						updateTable(currentDir, true);
+					}
+				} else {
+					JOptionPane.showMessageDialog(FileExplorerWindow.this,
+						"重命名失败，可能文件正在被使用或权限不足",
+						"错误", JOptionPane.ERROR_MESSAGE);
+				}
 			}
 		});
 
@@ -1076,6 +1119,9 @@ public class FileExplorerWindow extends JFrame {
 
                 	// 仅对文件夹显示"扫描此目录"菜单项
                 	mScanDirectory.setVisible(file.isDirectory());
+
+                	// 仅对文件夹显示"文件夹名转简体"菜单项
+                	mRenameToSimple.setVisible(file.isDirectory());
 
                 	menu.show(tbFile, e.getX(), e.getY());
                 }

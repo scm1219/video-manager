@@ -7,7 +7,6 @@ import javax.swing.JFrame;
 
 import com.github.scm1219.video.gui.table.FileTable;
 
-
 public class FileExplorerUI {
 
 	public static void main(String[] args) {

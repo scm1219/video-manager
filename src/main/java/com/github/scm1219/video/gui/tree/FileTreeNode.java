@@ -9,11 +9,9 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import com.github.scm1219.video.gui.IconCache;
 
 public class FileTreeNode extends DefaultMutableTreeNode {
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-
-	static FileSystemView fileSystemView = FileSystemView.getFileSystemView();
-
+    static FileSystemView fileSystemView = FileSystemView.getFileSystemView();
 
     private boolean isInit;
     private boolean isDummyRoot;
@@ -27,13 +25,15 @@ public class FileTreeNode extends DefaultMutableTreeNode {
 
     private File file;
 
-    public FileTreeNode(File file){
+    public FileTreeNode(File file) {
         this(file, false, true);
     }
-    public FileTreeNode(File file, boolean isDummyRoot){
-        this(file,isDummyRoot, true);
+
+    public FileTreeNode(File file, boolean isDummyRoot) {
+        this(file, isDummyRoot, true);
     }
-    public FileTreeNode(File file, boolean isDummyRoot, boolean allowsChildren){
+
+    public FileTreeNode(File file, boolean isDummyRoot, boolean allowsChildren) {
         super(file, allowsChildren);
         this.file = file;
         this.fileName = IconCache.getSystemDisplayName(file);

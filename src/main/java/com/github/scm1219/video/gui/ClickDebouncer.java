@@ -22,7 +22,8 @@ public class ClickDebouncer {
 
 	private static void cleanupHistory() {
 		long currentTime = System.currentTimeMillis();
-		recentOpenHistory.entrySet().removeIf(entry -> (currentTime - entry.getValue()) > DUPLICATE_CLICK_THRESHOLD * 10);
+		recentOpenHistory.entrySet()
+				.removeIf(entry -> (currentTime - entry.getValue()) > DUPLICATE_CLICK_THRESHOLD * 10);
 	}
 
 	public static boolean shouldOpen(String path) {

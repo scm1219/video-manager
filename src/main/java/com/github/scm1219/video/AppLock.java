@@ -12,10 +12,14 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * 应用程序单实例锁管理器
  *
- * <p>通过文件锁机制确保同一时间只有一个应用实例运行。
- * 使用 Java NIO FileLock 实现 OS 级别的文件锁，保证可靠性。</p>
+ * <p>
+ * 通过文件锁机制确保同一时间只有一个应用实例运行。
+ * 使用 Java NIO FileLock 实现 OS 级别的文件锁，保证可靠性。
+ * </p>
  *
- * <p>锁文件位置：{user.home}/.video-manager/.lock</p>
+ * <p>
+ * 锁文件位置：{user.home}/.video-manager/.lock
+ * </p>
  *
  * @author scm1219
  * @since 1.1.0
@@ -66,7 +70,9 @@ public class AppLock {
     /**
      * 尝试获取应用程序锁
      *
-     * <p>如果成功获取锁，将注册 JVM 关闭钩子以确保锁在程序退出时释放。</p>
+     * <p>
+     * 如果成功获取锁，将注册 JVM 关闭钩子以确保锁在程序退出时释放。
+     * </p>
      *
      * @return true 如果成功获取锁，false 如果锁已被其他实例持有
      */
@@ -111,8 +117,10 @@ public class AppLock {
     /**
      * 释放应用程序锁
      *
-     * <p>释放文件锁并关闭文件通道。通常由 JVM 关闭钩子自动调用，
-     * 但也可以手动调用以提前释放锁。</p>
+     * <p>
+     * 释放文件锁并关闭文件通道。通常由 JVM 关闭钩子自动调用，
+     * 但也可以手动调用以提前释放锁。
+     * </p>
      */
     public void release() {
         if (lock != null) {
@@ -134,7 +142,9 @@ public class AppLock {
     /**
      * 确保用户目录存在
      *
-     * <p>如果 {user.home}/.video-manager 目录不存在，则创建它。</p>
+     * <p>
+     * 如果 {user.home}/.video-manager 目录不存在，则创建它。
+     * </p>
      */
     private void ensureUserDirectoryExists() {
         String userHome = System.getProperty("user.home");
@@ -152,7 +162,9 @@ public class AppLock {
     /**
      * 注册 JVM 关闭钩子
      *
-     * <p>确保在 JVM 退出时自动释放锁。</p>
+     * <p>
+     * 确保在 JVM 退出时自动释放锁。
+     * </p>
      */
     private void registerShutdownHook() {
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
