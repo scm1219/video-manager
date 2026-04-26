@@ -4,12 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import javax.swing.JOptionPane;
-import javax.swing.JProgressBar;
-
 import com.github.scm1219.utils.FileUtils;
-import com.github.scm1219.video.gui.FileExplorerWindow;
-import com.github.scm1219.video.gui.tree.IndexValidationProcesser;
 
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
@@ -20,7 +15,7 @@ import lombok.extern.slf4j.Slf4j;
 @EqualsAndHashCode
 public class Disk {
 
-	public static final String FLAF_FILE = ".disk.needindex";
+	public static final String FLAG_FILE = ".disk.needindex";
 	public static final String INDEX_FILE = ".disk.sqlite";
 
 	private File disk;
@@ -54,7 +49,7 @@ public class Disk {
 	}
 
 	public boolean needIndex() {
-		File flagFile = new File(disk.getPath() + FLAF_FILE);
+		File flagFile = new File(disk.getPath() + FLAG_FILE);
 		return flagFile.exists();
 	}
 
@@ -62,7 +57,7 @@ public class Disk {
 		return listVideoDir(null);
 	}
 
-	private boolean findVideoDir(File parent, List<File> result, JProgressBar bar, boolean isTop) {
+	private boolean findVideoDir(File parent, List<File> result, ProgressCallback callback, boolean isTop) {
 		File[] subDirs = parent.listFiles();
 		boolean currentVideo = hasVideoFiles(parent);
 
@@ -74,12 +69,12 @@ public class Disk {
 					throw new IndexCancelledException();
 				}
 
-				if (bar != null && isTop) {
-					bar.setString("检查" + subDir.getAbsolutePath() + "是否需要扫描");
+				if (callback != null && isTop) {
+					callback.update(0, "检查" + subDir.getAbsolutePath() + "是否需要扫描");
 				}
 				if (subDir.isDirectory()) {
 					// 先遍历子目录是否包含视频
-					boolean subHasVideo = findVideoDir(subDir, result, bar, false);
+					boolean subHasVideo = findVideoDir(subDir, result, callback, false);
 					if (subHasVideo) {
 						currentVideo = true;
 					}
@@ -94,7 +89,7 @@ public class Disk {
 
 	/**
 	 * 判断当前文件夹下有无视频文件
-	 * 
+	 *
 	 * @param dir
 	 * @return
 	 */
@@ -110,10 +105,10 @@ public class Disk {
 		return false;
 	}
 
-	public List<File> listVideoDir(JProgressBar bar) {
+	public List<File> listVideoDir(ProgressCallback callback) {
 		File base = disk;
 		List<File> result = new ArrayList<>();
-		findVideoDir(base, result, bar, true);
+		findVideoDir(base, result, callback, true);
 		return result;
 	}
 
@@ -122,35 +117,20 @@ public class Disk {
 	}
 
 	/**
-	 * 执行索引验证和清理
-	 * 
-	 * @param disk 要验证的磁盘
+	 * 检查索引是否存在
+	 *
+	 * @return true 如果索引文件存在
 	 */
-	public void performValidateAndCleanup(FileExplorerWindow window) {
-		// 检查索引是否存在
-		if (!getIndex().exists()) {
-			JOptionPane.showMessageDialog(window,
-					"该磁盘尚未创建索引\n请先执行整盘索引创建",
-					"提示",
-					JOptionPane.INFORMATION_MESSAGE);
-			return;
-		}
+	public boolean hasIndex() {
+		return getIndex().exists();
+	}
 
-		// 检查是否正在索引
-		if (getIndex().isIndexing()) {
-			JOptionPane.showMessageDialog(window,
-					"索引正在创建中，请稍后再试",
-					"提示",
-					JOptionPane.INFORMATION_MESSAGE);
-			return;
-		}
-		Disk target = this;
-		// 启动验证和清理进程
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				new IndexValidationProcesser(target).setVisible(true);
-			}
-		}).start();
+	/**
+	 * 检查索引是否正在创建中
+	 *
+	 * @return true 如果正在创建索引
+	 */
+	public boolean isIndexInProgress() {
+		return getIndex().isIndexing();
 	}
 }

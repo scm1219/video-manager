@@ -13,6 +13,9 @@ import com.github.scm1219.video.domain.DiskManager;
 import com.github.scm1219.video.gui.FileExplorerWindow;
 import com.github.scm1219.video.gui.ThemeManager;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 public class VideoManagerApp {
     public static void main(String args[]) {
 
@@ -35,7 +38,7 @@ public class VideoManagerApp {
         try {
             frame.setIconImage(ImageIO.read(VideoManagerApp.class.getClassLoader().getResource("0.gif")));
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("加载窗口图标失败", e);
         }
 
         frame.setVisible(true);
@@ -65,9 +68,9 @@ public class VideoManagerApp {
             // 如果 FlatLaf 加载失败，回退到系统默认外观
             try {
                 UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
-                System.err.println("FlatLaf 加载失败，已回退到系统外观: " + e.getMessage());
+                log.warn("FlatLaf 加载失败，已回退到系统外观: {}", e.getMessage());
             } catch (Exception ex) {
-                System.err.println("系统外观加载失败: " + ex.getMessage());
+                log.error("系统外观加载失败: {}", ex.getMessage());
             }
         }
     }
@@ -93,9 +96,9 @@ public class VideoManagerApp {
                     "应用程序已在运行",
                     JOptionPane.ERROR_MESSAGE);
         } catch (Exception e) {
-            // 如果对话框显示失败（如无图形界面），输出到控制台
-            System.err.println("应用程序已在运行，无法启动新实例。");
-            System.err.println("锁文件位置: " + AppLock.getInstance().getLockFile().getAbsolutePath());
+            // 如果对话框显示失败（如无图形界面），记录日志
+            log.error("应用程序已在运行，无法启动新实例。");
+            log.error("锁文件位置: {}", AppLock.getInstance().getLockFile().getAbsolutePath());
         }
     }
 }

@@ -98,7 +98,7 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
             this.setIcon(null);
         } else if (column == 3) {
             long size = (long) value;
-            String fileSize = FileUtils.formetFileSize(size);
+            String fileSize = FileUtils.formatFileSize(size);
             File file = (File) table.getValueAt(row, 0);
             if (fileSystemView.isComputerNode(file) || fileSystemView.isDrive(file) || file.isDirectory()) {
                 this.setText(null);

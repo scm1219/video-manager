@@ -18,11 +18,9 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
-import java.io.InputStream;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Properties;
 import java.util.Stack;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
@@ -32,30 +30,22 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
-import javax.swing.JRadioButtonMenuItem;
-import javax.swing.ButtonGroup;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.UIManager;
 import javax.swing.JTextField;
-import javax.swing.JTree;
 import javax.swing.ScrollPaneLayout;
 import javax.swing.ActionMap;
 import javax.swing.InputMap;
 import javax.swing.AbstractAction;
 import javax.swing.JComponent;
 import javax.swing.KeyStroke;
-import javax.swing.JEditorPane;
 import javax.swing.event.DocumentListener;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.TreeSelectionEvent;
 import javax.swing.event.TreeSelectionListener;
-import javax.swing.event.HyperlinkEvent;
-import javax.swing.event.HyperlinkListener;
-import java.awt.Desktop;
 import javax.swing.filechooser.FileSystemView;
 import javax.swing.table.TableRowSorter;
 import javax.swing.tree.DefaultTreeModel;
@@ -64,6 +54,7 @@ import javax.swing.tree.TreePath;
 
 import org.apache.commons.lang3.StringUtils;
 
+import com.github.scm1219.video.AppConfig;
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
 import com.github.scm1219.video.gui.table.FileTable;
@@ -71,53 +62,106 @@ import com.github.scm1219.video.gui.table.FileTableModel;
 import com.github.scm1219.video.gui.tree.FileTree;
 import com.github.scm1219.video.gui.tree.FileTreeCellRenderer;
 import com.github.scm1219.video.gui.tree.FileTreeNode;
-import com.github.scm1219.video.gui.tree.FileUpdateProcesser;
 import com.github.scm1219.utils.FileUtils;
 
 import java.awt.Font;
 
-public class FileExplorerWindow extends JFrame {
+public class FileExplorerWindow extends JFrame
+		implements MenuBarBuilder.ThemeMenuCallback, MenuBarBuilder.IndexValidationCallback, ContextMenuBuilder.NavigationCallback {
 	private static final long serialVersionUID = 1L;
-	private JPanel pnlTop;
-    private JPanel pnlLeft;
-    private JPanel pnlRight;
-    private JPanel pnlIndexInfo;
-    private JSplitPane spBottom;
-    private JSplitPane spLeft;
-    private JTextField tfDir;
-    private JTextField tfSearch;
-    private JCheckBox chkRealtimeSearch;  // 实时搜索复选框
+	private JPanel topPanel;
+    private JPanel leftPanel;
+    private JPanel rightPanel;
+    private JPanel indexInfoPanel;
+    private JSplitPane bottomSplitPane;
+    private JSplitPane leftSplitPane;
+    private JTextField directoryField;
+    private JTextField searchField;
+    private JCheckBox realtimeSearchCheckBox;  // 实时搜索复选框
     private Timer searchTimer;            // 延迟定时器
     private FileTreeNode fileTreeRoot;
-    private FileTree trFileTree;
-    private FileTable tbFile;
-    private Stack<File> stackFile;
+    private FileTree fileTree;
+    private FileTable fileTable;
+    private Stack<File> navigationStack;
     private JButton btnBack;
     private JButton btnSearch;
     private JButton btnCleanSearch;
     private JButton btnSearchDir;
     private JButton btnRefresh;
-    private JCheckBox chkVideoOnly;
-    private JCheckBox chkShowAllDisks;
+    private JCheckBox videoOnlyCheckBox;
+    private JCheckBox showAllDisksCheckBox;
     private JScrollPane spTable;
     private JScrollPane spIndexInfo;
     private FileSystemView fileSystemView = FileSystemView.getFileSystemView();
-    private JPopupMenu menu = new JPopupMenu();
+    private JPopupMenu menu;
     private JMenuItem mNavigateTo;
     private JMenuItem mScanDirectory;
     private JMenuItem mRenameToSimple;
     private javax.swing.JLabel lblStatusBar;  // 状态栏标签
-    private JRadioButtonMenuItem themeLightMenuItem;
-    private JRadioButtonMenuItem themeDarkMenuItem;
-    private JRadioButtonMenuItem themeAutoMenuItem;
+    private JMenu themeMenu;
     private boolean videoOnly = false;
     private boolean showAllDisks = false;
     private boolean isSearchMode = false;
 
+	// ---- MenuBarBuilder.ThemeMenuCallback 实现 ----
+
+	@Override
+	public void switchTheme(String themeName) {
+		// 检查是否与当前主题相同，相同则不执行切换
+		String currentTheme = ThemeManager.getInstance().getCurrentTheme();
+		if (currentTheme.equalsIgnoreCase(themeName)) {
+			return;
+		}
+
+		boolean success = ThemeManager.getInstance().applyTheme(themeName);
+		if (success) {
+			// 刷新所有组件的 UI
+			ThemeManager.updateUI();
+			updateIndexInfo();
+			// 更新主题菜单选中状态
+			MenuBarBuilder.updateThemeMenuSelection(themeMenu, getCurrentTheme());
+			// 显示切换成功提示
+			JOptionPane.showMessageDialog(this,
+				"已切换到" + ThemeManager.getThemeDisplayName(themeName),
+				"主题切换",
+				JOptionPane.INFORMATION_MESSAGE);
+		} else {
+			// 显示切换失败提示
+			JOptionPane.showMessageDialog(this,
+				"主题切换失败，请查看控制台日志",
+				"错误",
+				JOptionPane.ERROR_MESSAGE);
+		}
+	}
+
+	@Override
+	public String getCurrentTheme() {
+		return ThemeManager.getInstance().getCurrentTheme();
+	}
+
+	// ---- MenuBarBuilder.IndexValidationCallback 实现 ----
+
+	@Override
+	public void validateAndCleanupIndex() {
+		MenuBarBuilder.showIndexValidationDialog(this, fileSystemView);
+	}
+
+	// ---- ContextMenuBuilder.NavigationCallback 实现 ----
+
+	@Override
+	public Stack<File> getNavigationStack() {
+		return navigationStack;
+	}
+
+	@Override
+	public File getCurrentDir() {
+		return currentDir;
+	}
+
     private void initData(){
-        stackFile = new Stack<File>();
+        navigationStack = new Stack<File>();
         File[] rootDisks;
-        
+
         if (showAllDisks) {
             rootDisks = File.listRoots();
         } else {
@@ -127,10 +171,10 @@ public class FileExplorerWindow extends JFrame {
                 rootDisks[i]=listDisk.get(i).getRoot();
             }
         }
-        
+
         if(rootDisks.length>0) {
 	        fileTreeRoot = new FileTreeNode(rootDisks[0], true);
-	        
+
 	        File[] files = rootDisks;
 	        for (int i = 0; i < files.length; i++) {
 	            if (files[i].isDirectory())
@@ -145,542 +189,50 @@ public class FileExplorerWindow extends JFrame {
     }
 
     private void createComponent(){
-        pnlTop = new JPanel();
-        pnlLeft = new JPanel();
-        pnlRight = new JPanel();
-        pnlIndexInfo = new JPanel();
-        spBottom = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
-        spLeft = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
-        tfDir = new JTextField();
-        tfDir.setEditable(false);
-        tfSearch =  new JTextField();
-        trFileTree = new FileTree();
-        tbFile = new FileTable();
+        topPanel = new JPanel();
+        leftPanel = new JPanel();
+        rightPanel = new JPanel();
+        indexInfoPanel = new JPanel();
+        bottomSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+        leftSplitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT);
+        directoryField = new JTextField();
+        directoryField.setEditable(false);
+        searchField =  new JTextField();
+        fileTree = new FileTree();
+        fileTable = new FileTable();
         btnBack = new JButton("后退");
         btnSearch =  new JButton("搜索文件");
         btnCleanSearch =  new JButton("清空搜索");
         btnSearchDir = new JButton("搜索文件夹");
         btnRefresh = new JButton("刷新磁盘");
-        chkVideoOnly = new JCheckBox("只显示视频文件");
-        chkShowAllDisks = new JCheckBox("显示所有磁盘");
-        chkRealtimeSearch = new JCheckBox("实时搜索");
-        chkRealtimeSearch.setSelected(false);  // 默认不选中
+        videoOnlyCheckBox = new JCheckBox("只显示视频文件");
+        showAllDisksCheckBox = new JCheckBox("显示所有磁盘");
+        realtimeSearchCheckBox = new JCheckBox("实时搜索");
+        realtimeSearchCheckBox.setSelected(false);  // 默认不选中
         lblStatusBar = new javax.swing.JLabel(" ");  // 初始化状态栏
 
         // 初始化实时搜索定时器（700ms延迟）
-        searchTimer = new Timer(700, new ActionListener() {
+        searchTimer = new Timer(AppConfig.SEARCH_DEBOUNCE_MS, new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (chkRealtimeSearch.isSelected() && StringUtils.isNotBlank(tfSearch.getText())) {
+                if (realtimeSearchCheckBox.isSelected() && StringUtils.isNotBlank(searchField.getText())) {
                     performSearch();  // 执行搜索
                 }
             }
         });
         searchTimer.setRepeats(false);  // 仅触发一次，不重复
 
-        JMenuItem mEchoIndexInfo;
-		mEchoIndexInfo = new JMenuItem("打开所在文件夹");
-		menu.add(mEchoIndexInfo);
-		mEchoIndexInfo.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				FileTable fileTable = (FileTable)menu.getInvoker();
-				int row =fileTable.getSelectedRow();
-                File file = (File) fileTable.getValueAt(row, 0);
-                String filePath = file.getAbsolutePath();
-                if (ClickDebouncer.shouldOpen(filePath)) {
-                    try {
-                        FileUtils.openDirAndSelectFile(file);
-                    } catch (Exception ex) {
-                        ClickDebouncer.recordError(filePath);
-                    }
-                }
-			}
-		});
-
-		// 新增：扫描此目录菜单项
-		mScanDirectory = new JMenuItem("扫描此目录");
-		menu.add(mScanDirectory);
-		mScanDirectory.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				FileTable fileTable = (FileTable)menu.getInvoker();
-				int row = fileTable.getSelectedRow();
-                File file = (File) fileTable.getValueAt(row, 0);
-
-                // 确定要扫描的目录
-                File targetDir;
-                if(file.isDirectory()) {
-                	targetDir = file;
-                } else {
-                	targetDir = file.getParentFile();
-                }
-
-                // 查找磁盘
-                Disk disk = DiskManager.getInstance().findDisk(targetDir);
-                if(disk == null) {
-                	JOptionPane.showMessageDialog(null,
-                			"该磁盘未启用索引功能\n请在磁盘根目录创建 " + Disk.FLAF_FILE + " 文件",
-                			"提示",
-                			MessageType.INFO.ordinal());
-                	return;
-                }
-
-                // 检查是否正在索引
-                if(disk.getIndex().isIndexing()) {
-                	JOptionPane.showMessageDialog(null,
-                			"索引正在创建中，请稍后",
-                			"提示",
-                			MessageType.INFO.ordinal());
-                	return;
-                }
-
-                // 启动目录扫描
-                new Thread(new Runnable() {
-                	@Override
-                	public void run() {
-                		FileUpdateProcesser pro = new FileUpdateProcesser(disk, targetDir);
-                		pro.setVisible(true);
-                	}
-                }).start();
-			}
-		});
-
-		// 新增：转到菜单项
-		mNavigateTo = new JMenuItem("转到");
-		menu.add(mNavigateTo);
-		mNavigateTo.addActionListener(new ActionListener() {
-
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				FileTable fileTable = (FileTable)menu.getInvoker();
-				int row = fileTable.getSelectedRow();
-                File file = (File) fileTable.getValueAt(row, 0);
-
-                // 检测文件存在性
-                if (canNavigateToFile(file)) {
-                    File parentDir = file.getParentFile();
-
-                    stackFile.clear();  // 清空旧的历史记录
-
-                    // 重建完整的目录层级路径（从根目录到父目录）
-                    File current = parentDir;
-                    java.util.Stack<File> tempStack = new java.util.Stack<>();
-
-                    // 从父目录向上遍历到根目录
-                    while (current != null && current.exists()) {
-                        tempStack.push(current);
-                        current = current.getParentFile();
-                    }
-
-                    // 反向压入栈（从根到父目录）
-                    while (!tempStack.isEmpty()) {
-                        stackFile.push(tempStack.pop());
-                    }
-
-                    // 使用 true 参数避免重复压入 parentDir
-                    updateTable(parentDir, true);
-                } else {
-                    JOptionPane.showMessageDialog(FileExplorerWindow.this,
-                        file == null || !file.exists() ? "文件不存在" : "父目录不存在或无法访问",
-                        "错误",
-                        JOptionPane.ERROR_MESSAGE);
-                }
-			}
-		});
-
-		// 新增：文件夹名转简体菜单项
-		mRenameToSimple = new JMenuItem("文件夹名转简体");
-		menu.add(mRenameToSimple);
-		mRenameToSimple.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				FileTable fileTable = (FileTable)menu.getInvoker();
-				int row = fileTable.getSelectedRow();
-				File file = (File) fileTable.getValueAt(row, 0);
-
-				if (!file.isDirectory()) return;
-
-				String oldName = file.getName();
-				String newName = com.github.houbb.opencc4j.util.ZhConverterUtil.toSimple(oldName);
-
-				if (newName.equals(oldName)) {
-					JOptionPane.showMessageDialog(FileExplorerWindow.this,
-						"文件夹名已经是简体中文，无需转换",
-						"提示", JOptionPane.INFORMATION_MESSAGE);
-					return;
-				}
-
-				int confirm = JOptionPane.showConfirmDialog(FileExplorerWindow.this,
-					"将文件夹重命名：\n\"" + oldName + "\"\n→ \"" + newName + "\"",
-					"确认重命名", JOptionPane.YES_NO_OPTION);
-
-				if (confirm != JOptionPane.YES_OPTION) return;
-
-				File newFile = new File(file.getParentFile(), newName);
-				if (file.renameTo(newFile)) {
-					IconCache.clear();
-					if (currentDir != null) {
-						updateTable(currentDir, true);
-					}
-				} else {
-					JOptionPane.showMessageDialog(FileExplorerWindow.this,
-						"重命名失败，可能文件正在被使用或权限不足",
-						"错误", JOptionPane.ERROR_MESSAGE);
-				}
-			}
-		});
-
-		// 创建菜单栏和主题菜单
-		createMenuBar();
-    }
-
-    /**
-     * 创建菜单栏和主题菜单
-     */
-    private void createMenuBar() {
-    	JMenuBar menuBar = new JMenuBar();
-
-    	// 创建主题菜单
-    	JMenu themeMenu = new JMenu("主题");
-
-    	// 创建单选按钮组
-    	ButtonGroup themeButtonGroup = new ButtonGroup();
-
-    	// 创建浅色主题菜单项
-    	themeLightMenuItem = new JRadioButtonMenuItem("浅色主题");
-    	final String themeLightCode = ThemeManager.THEME_LIGHT;
-    	themeLightMenuItem.addActionListener(e -> switchTheme(themeLightCode));
-    	themeButtonGroup.add(themeLightMenuItem);
-    	themeMenu.add(themeLightMenuItem);
-
-    	// 创建深色主题菜单项
-    	themeDarkMenuItem = new JRadioButtonMenuItem("深色主题");
-    	final String themeDarkCode = ThemeManager.THEME_DARK;
-    	themeDarkMenuItem.addActionListener(e -> switchTheme(themeDarkCode));
-    	themeButtonGroup.add(themeDarkMenuItem);
-    	themeMenu.add(themeDarkMenuItem);
-
-    	// 创建跟随系统主题菜单项
-    	themeAutoMenuItem = new JRadioButtonMenuItem("跟随系统");
-    	final String themeAutoCode = ThemeManager.THEME_AUTO;
-    	themeAutoMenuItem.addActionListener(e -> switchTheme(themeAutoCode));
-    	themeButtonGroup.add(themeAutoMenuItem);
-    	themeMenu.add(themeAutoMenuItem);
-
-    	// 根据当前主题设置选中状态
-    	updateThemeMenuSelection();
-
-    	// 将主题菜单添加到菜单栏
-    	menuBar.add(themeMenu);
-
-    	// 创建索引菜单
-    	JMenu indexMenu = new JMenu("索引");
-
-    	// 验证并清理索引菜单项
-    	JMenuItem validateAndCleanupItem = new JMenuItem("验证并清理索引");
-    	validateAndCleanupItem.addActionListener(e -> validateAndCleanupIndex());
-    	indexMenu.add(validateAndCleanupItem);
-
-    	// 将索引菜单添加到菜单栏
-    	menuBar.add(indexMenu);
-
-    	// 创建帮助菜单
-    	JMenu helpMenu = new JMenu("帮助");
-
-    	// 使用说明菜单项
-    	JMenuItem userManualItem = new JMenuItem("使用说明");
-    	userManualItem.addActionListener(e -> showUserManual());
-    	helpMenu.add(userManualItem);
-
-    	// 关于菜单项
-    	JMenuItem aboutItem = new JMenuItem("关于");
-    	aboutItem.addActionListener(e -> showAbout());
-    	helpMenu.add(aboutItem);
-
-    	// 将帮助菜单添加到菜单栏
-    	menuBar.add(helpMenu);
-
-    	// 设置窗口的菜单栏
-    	this.setJMenuBar(menuBar);
-    }
-
-    /**
-     * 验证并清理所有磁盘的索引
-     */
-    private void validateAndCleanupIndex() {
-    	List<Disk> disks = DiskManager.getInstance().listDisk();
-    	if(disks.isEmpty()) {
-    		JOptionPane.showMessageDialog(this,
-    			"未发现需要索引的磁盘",
-    			"提示",
-    			JOptionPane.INFORMATION_MESSAGE);
-    		return;
-    	}
-
-    	// 询问用户选择磁盘
-    	if(disks.size() == 1) {
-    		// 只有一个磁盘，显示警告并确认
-    		Disk disk = disks.get(0);
-    		String displayName = fileSystemView.getSystemDisplayName(disk.getRoot());
-    		if(displayName == null || displayName.isEmpty()) {
-    			displayName = disk.getPath();
-    		}
-
-    		if(confirmIndexCheck(displayName) == JOptionPane.YES_OPTION) {
-    			disk.performValidateAndCleanup(this);
-    		}
-    	} else {
-    		// 多个磁盘，让用户选择
-    		Object[] options = new Object[disks.size()];
-    		for(int i = 0; i < disks.size(); i++) {
-    			Disk disk = disks.get(i);
-    			String displayName = fileSystemView.getSystemDisplayName(disk.getRoot());
-    			if(displayName == null || displayName.isEmpty()) {
-    				displayName = disk.getPath();
-    			}
-    			options[i] = displayName + " (" + disk.getPath() + ")";
-    		}
-
-    		int selected = JOptionPane.showOptionDialog(this,
-    			"请选择要验证的磁盘:",
-    			"选择磁盘",
-    			JOptionPane.YES_NO_CANCEL_OPTION,
-    			JOptionPane.QUESTION_MESSAGE,
-    			null,
-    			options,
-    			options[0]);
-
-    		if(selected >= 0 && selected < disks.size()) {
-    			Disk selectedDisk = disks.get(selected);
-    			String selectedDisplayName = fileSystemView.getSystemDisplayName(selectedDisk.getRoot());
-    			if(selectedDisplayName == null || selectedDisplayName.isEmpty()) {
-    				selectedDisplayName = selectedDisk.getPath();
-    			}
-    			// 显示二次确认警告
-    			if(confirmIndexCheck(selectedDisplayName) == JOptionPane.YES_OPTION) {
-    				selectedDisk.performValidateAndCleanup(this);
-    			}
-    		}
-    	}
-    }
-
-	private int confirmIndexCheck(String selectedDisplayName) {
-		return JOptionPane.showConfirmDialog(this,
-			"确定要验证并清理磁盘 \"" + selectedDisplayName + "\" 的索引吗？\n\n" +
-			"⚠️ 警告：此操作将执行以下操作：\n" +
-			"   • 删除索引中指向已不存在文件的记录\n" +
-			"   • 清理无效的索引数据\n" +
-			"   • 无法恢复已删除的索引记录\n\n" +
-			"建议：执行前请确保磁盘已正确连接。",
-			"确认索引清理",
-			JOptionPane.YES_NO_OPTION,
-			JOptionPane.WARNING_MESSAGE);
-	}
-
-    /**
-     * 获取应用程序版本号
-     * 从 pom.xml 读取，如果失败则返回默认版本
-     * @return 版本号字符串
-     */
-    private String getAppVersion() {
-    	try {
-    		// 读取 version.properties 文件
-    		Properties props = new Properties();
-    		try (InputStream is = getClass().getClassLoader()
-    				.getResourceAsStream("version.properties")) {
-    			if (is != null) {
-    				props.load(is);
-    				String version = props.getProperty("version");
-    				if (version != null && !version.isEmpty()) {
-    					return version;
-    				}
-    			}
-    		}
-    	} catch (Exception e) {
-    		// 读取失败，使用默认版本
-    	}
-    	return "1.1.0-RELEASE"; // 默认版本
-    }
-
-    /**
-     * 显示使用说明对话框
-     */
-    private void showUserManual() {
-    	// 获取当前主题的颜色
-    	String primaryColor = ThemeManager.getPrimaryColor();
-    	String textColor = ThemeManager.getTextColor();
-
-    	String helpHtml = String.format("""
-    		<html>
-    		<div style='padding: 0px; font-family: Microsoft YaHei, Arial;'>
-    		<h2 style='color: %s; margin: 5px 0;'>使用说明</h2>
-
-    		<h3 style='color: %s; margin: 0px 0;'>基本功能</h3>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>搜索文件</b>：在搜索框输入关键词，按回车或点击搜索按钮</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>实时搜索</b>：勾选"实时搜索"复选框，输入时自动搜索（700ms延迟）</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>搜索目录</b>：点击"搜索目录"按钮查找包含视频的文件夹</li>
-
-    		<h3 style='color: %s; margin: 0px 0;'>导航操作</h3>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>后退</b>：点击后退按钮返回上一级目录</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>双击</b>：双击文件夹进入，双击视频文件直接播放</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>右键菜单</b>：打开所在文件夹、扫描目录、转到</li>
-
-    		<h3 style='color: %s; margin: 0px 0;'>索引管理</h3>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>创建索引</b>：在磁盘根目录创建 <code>.disk.needindex</code> 文件</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>验证索引</b>：使用"索引 → 验证并清理索引"菜单</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>索引文件</b>：存储在磁盘根目录的 <code>.disk.sqlite</code></li>
-
-    		<h3 style='color: %s; margin: 0px 0;'>快捷键</h3>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>Ctrl + F</b>：聚焦搜索框并选中全部文本</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>Alt + W</b>：清空搜索内容</li>
-    		<li style='margin-top: 0px; margin: 1px 0;'><b>Enter</b>：执行搜索（搜索框焦点时）</li>
-
-    		<h3 style='color: %s; margin: 0px 0;'>主题切换</h3>
-    		<li style='margin-top: 0px; margin: 1px 0;'>使用"主题"菜单切换浅色/深色/跟随系统主题</li>
-
-    		</div>
-    		</html>
-    		""", primaryColor, textColor, textColor, textColor, textColor, textColor);
-
-    	// 创建 JEditorPane 并设置 HTML 内容
-    	JEditorPane editorPane = new JEditorPane("text/html", helpHtml);
-    	editorPane.setEditable(false);
-    	editorPane.setBackground(UIManager.getColor("Panel.background"));
-
-    	// 包装到 JScrollPane
-    	JScrollPane scrollPane = new JScrollPane(editorPane);
-    	scrollPane.setPreferredSize(new Dimension(600, 500));
-
-    	JOptionPane.showMessageDialog(this,
-    		scrollPane,
-    		"使用说明",
-    		JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    /**
-     * 显示关于对话框
-     */
-    private void showAbout() {
-    	String version = getAppVersion();
-    	// 获取当前主题的颜色
-    	String primaryColor = ThemeManager.getPrimaryColor();
-    	String textColor = ThemeManager.getTextColor();
-    	String secondaryTextColor = ThemeManager.getSecondaryTextColor();
-
-    	String aboutHtml = String.format("""
-    		<html>
-    		<div style='text-align: left; padding: 0px; font-family: Microsoft YaHei, Arial;'>
-    		<h2 style='color: %s; margin: 5px 0;'>视频文件管理器</h2>
-            <p style='font-size: 10px; margin: 3px 0; color: %s;'>
-    		针对多移动硬盘的视频文件快速查找与管理工具
-    		</p>
-    		<p style='font-size: 10px; margin: 3px 0; color: %s;'>
-    		<b>版本:</b> %s
-    		</p>
-            <p style='font-size: 10px; margin: 3px 0; color: %s;'>
-    		<b>作者:</b> scm1219
-    		</p>
-    		<p style='font-size: 10px; margin: 3px 0;'>
-            <b>地址:</b>
-    		<a href='https://github.com/scm1219/video-manager'
-    		   style='color: %s; text-decoration: none;'>
-    		   https://github.com/scm1219/video-manager
-    		</a>
-    		</p>
-
-    		</div>
-    		</html>
-    		""", primaryColor, secondaryTextColor, textColor, version, textColor, primaryColor);
-
-    	// 创建 JEditorPane 并设置 HTML 内容
-    	JEditorPane editorPane = new JEditorPane("text/html", aboutHtml);
-    	editorPane.setEditable(false);
-    	editorPane.setBackground(UIManager.getColor("Panel.background"));
-
-    	// 添加超链接监听器（支持 GitHub 链接点击）
-    	editorPane.addHyperlinkListener(new HyperlinkListener() {
-    		@Override
-    		public void hyperlinkUpdate(HyperlinkEvent e) {
-    			if (e.getEventType() == HyperlinkEvent.EventType.ACTIVATED) {
-    				try {
-    					Desktop.getDesktop().browse(e.getURL().toURI());
-    				} catch (Exception ex) {
-    					// 用户友好的错误提示
-    					JOptionPane.showMessageDialog(FileExplorerWindow.this,
-    							"无法打开浏览器，请手动访问：\n" + e.getURL(),
-    							"错误",
-    							JOptionPane.ERROR_MESSAGE);
-    					ex.printStackTrace();
-    				}
-    			}
-    		}
-    	});
-
-    	JScrollPane scrollPane = new JScrollPane(editorPane);
-    	scrollPane.setPreferredSize(new Dimension(500, 300));
-
-    	JOptionPane.showMessageDialog(this,
-    		scrollPane,
-    		"关于",
-    		JOptionPane.INFORMATION_MESSAGE);
-    }
-
-    /**
-     * 更新主题菜单的选中状态
-     */
-    private void updateThemeMenuSelection() {
-    	String currentTheme = ThemeManager.getInstance().getCurrentTheme();
-
-    	// 根据当前主题设置对应的单选按钮为选中状态
-    	switch (currentTheme.toLowerCase()) {
-    		case ThemeManager.THEME_DARK:
-    			themeDarkMenuItem.setSelected(true);
-    			break;
-    		case ThemeManager.THEME_AUTO:
-    			themeAutoMenuItem.setSelected(true);
-    			break;
-    		case ThemeManager.THEME_LIGHT:
-    		default:
-    			themeLightMenuItem.setSelected(true);
-    			break;
-    	}
-    }
-
-    /**
-     * 切换主题
-     * @param themeName 主题名称（light/dark/auto）
-     */
-    private void switchTheme(String themeName) {
-    	// 检查是否与当前主题相同，相同则不执行切换
-    	String currentTheme = ThemeManager.getInstance().getCurrentTheme();
-    	if (currentTheme.equalsIgnoreCase(themeName)) {
-    		return;
-    	}
-
-    	boolean success = ThemeManager.getInstance().applyTheme(themeName);
-    	if (success) {
-    		// 刷新所有组件的 UI
-    		ThemeManager.updateUI();
-    		updateIndexInfo();
-    		// 更新主题菜单选中状态
-    		updateThemeMenuSelection();
-    		// 显示切换成功提示
-    		JOptionPane.showMessageDialog(this,
-    			"已切换到" + ThemeManager.getThemeDisplayName(themeName),
-    			"主题切换",
-    			JOptionPane.INFORMATION_MESSAGE);
-    	} else {
-
-    		// 显示切换失败提示
-    		JOptionPane.showMessageDialog(this,
-    			"主题切换失败，请查看控制台日志",
-    			"错误",
-    			JOptionPane.ERROR_MESSAGE);
-    	}
-
+        // 使用 ContextMenuBuilder 创建右键菜单
+        ContextMenuBuilder.MenuItems contextMenuItems = ContextMenuBuilder.buildContextMenu(this, this);
+        menu = contextMenuItems.popupMenu;
+        mNavigateTo = contextMenuItems.navigateToItem;
+        mScanDirectory = contextMenuItems.scanDirectoryItem;
+        mRenameToSimple = contextMenuItems.renameToSimpleItem;
+
+        // 使用 MenuBarBuilder 创建菜单栏
+        JMenuBar menuBar = MenuBarBuilder.buildMenuBar(this, this, this, fileSystemView);
+        themeMenu = (JMenu) menuBar.getMenu(0);  // 第一个菜单是主题菜单
+        this.setJMenuBar(menuBar);
     }
 
     public static final Comparator<File> FILE_COMPARATOR= new Comparator<File>() {
@@ -713,7 +265,7 @@ public class FileExplorerWindow extends JFrame {
      * 执行文件搜索（供按钮、键盘、实时搜索调用）
      */
     private void performSearch() {
-        String keyword = tfSearch.getText();
+        String keyword = searchField.getText();
         if (StringUtils.isNotBlank(keyword)) {
             List<File> files = DiskManager.getInstance().searchAllFiles(keyword);
             updateSearchResult(files);
@@ -741,7 +293,7 @@ public class FileExplorerWindow extends JFrame {
     	// 更新状态栏显示搜索结果数量和已删除数量
     	updateStatusBar(files.size(), true, deletedCount);
     }
-    
+
     /**
      * 设置表格里的数据
      * @param files 文件数组
@@ -775,23 +327,22 @@ public class FileExplorerWindow extends JFrame {
         }
 
         FileTableModel model = new FileTableModel(fileData, showParentRow);
-//        model.setCheckFileExists(isSearchMode);
-        tbFile.setModel(model);
+        fileTable.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
         sort.setComparator(0, FILE_COMPARATOR);
         sort.setComparator(3, FILE_SIZE_COMPARATOR);
-        tbFile.setRowSorter(sort);
-        tbFile.getColumnModel().getColumn(0).setPreferredWidth(180);
-        tbFile.getColumnModel().getColumn(1).setPreferredWidth(120);
-        tbFile.getColumnModel().getColumn(2).setPreferredWidth(80);
-        tbFile.getColumnModel().getColumn(3).setPreferredWidth(50);
-        tbFile.getColumnModel().getColumn(4).setPreferredWidth(150);
+        fileTable.setRowSorter(sort);
+        fileTable.getColumnModel().getColumn(0).setPreferredWidth(180);
+        fileTable.getColumnModel().getColumn(1).setPreferredWidth(120);
+        fileTable.getColumnModel().getColumn(2).setPreferredWidth(80);
+        fileTable.getColumnModel().getColumn(3).setPreferredWidth(50);
+        fileTable.getColumnModel().getColumn(4).setPreferredWidth(150);
         spTable.getViewport().setBackground(Color.white);
-        
+
         // 更新状态栏显示文件总数
         updateStatusBar(fileList.size(), false, 0);
     }
-    
+
     /**
      * 更新状态栏显示
      * @param count 文件数量
@@ -811,15 +362,15 @@ public class FileExplorerWindow extends JFrame {
     }
 
     private File currentDir = null;
-    
+
     private void updateIndexInfo() {
     	StringBuilder info = new StringBuilder();
     	info.append("<html><body style='padding: 10px; font-family: sans-serif;'>");
     	info.append("<h3 style='margin-top: 0; color: "+ThemeManager.getPrimaryColor()+";'>索引信息</h3>");
-    	
+
     	List<Disk> disks = DiskManager.getInstance().listDisk();
     	info.append("<p><strong>索引磁盘数量:</strong> ").append(disks.size()).append("</p>");
-    	
+
     	if (!disks.isEmpty()) {
     		info.append("<p><strong>磁盘列表:</strong></p>");
     		info.append("<ul>");
@@ -832,22 +383,22 @@ public class FileExplorerWindow extends JFrame {
     		}
     		info.append("</ul>");
     	}
-    	
+
     	info.append("<p style='color: "+ThemeManager.getSecondaryTextColor()+"; '>提示: 双击视频文件可直接播放</p>");
     	info.append("</body></html>");
-    	
-    	pnlIndexInfo.removeAll();
+
+    	indexInfoPanel.removeAll();
     	javax.swing.JLabel lblInfo = new javax.swing.JLabel(info.toString());
     	lblInfo.setFont(new Font("Microsoft YaHei", Font.PLAIN, 12));
-    	pnlIndexInfo.setLayout(new java.awt.BorderLayout());
-    	pnlIndexInfo.add(lblInfo, java.awt.BorderLayout.NORTH);
-    	pnlIndexInfo.revalidate();
-    	pnlIndexInfo.repaint();
+    	indexInfoPanel.setLayout(new java.awt.BorderLayout());
+    	indexInfoPanel.add(lblInfo, java.awt.BorderLayout.NORTH);
+    	indexInfoPanel.revalidate();
+    	indexInfoPanel.repaint();
     }
 
     private void refreshTree(boolean showPrompt) {
     	// 保存当前选中的文件
-    	TreePath selectedPath = trFileTree.getSelectionPath();
+    	TreePath selectedPath = fileTree.getSelectionPath();
     	File selectedFile = null;
     	if (selectedPath != null) {
     		FileTreeNode node = (FileTreeNode) selectedPath.getLastPathComponent();
@@ -870,15 +421,15 @@ public class FileExplorerWindow extends JFrame {
                 return ((File)treeNode.getUserObject()).isFile();
             }
         };
-        trFileTree.setModel(dfTreeModel);
-        trFileTree.setCellRenderer(new FileTreeCellRenderer());
-        trFileTree.setRootVisible(false);
+        fileTree.setModel(dfTreeModel);
+        fileTree.setCellRenderer(new FileTreeCellRenderer());
+        fileTree.setRootVisible(false);
 
         // 恢复选择或选择第一个
         if (selectedFile != null) {
         	restoreSelection(selectedFile);
-        } else if (trFileTree.getRowCount() > 0) {
-        	trFileTree.setSelectionRow(0);
+        } else if (fileTree.getRowCount() > 0) {
+        	fileTree.setSelectionRow(0);
         }
 
         updateIndexInfo();
@@ -886,7 +437,7 @@ public class FileExplorerWindow extends JFrame {
         if (showPrompt) {
         	List<Disk> disks = DiskManager.getInstance().listDisk();
         	if(disks.size()<1) {
-        		JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "提示", MessageType.INFO.ordinal());
+        		JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAG_FILE+" 文件", "提示", MessageType.INFO.ordinal());
         	} else {
         		JOptionPane.showMessageDialog(null, "刷新成功，共发现 "+disks.size()+" 个需要索引的磁盘", "提示", MessageType.INFO.ordinal());
         	}
@@ -898,7 +449,7 @@ public class FileExplorerWindow extends JFrame {
      * @param targetFile 目标文件对象
      */
     private void restoreSelection(File targetFile) {
-    	TreeNode root = (TreeNode) trFileTree.getModel().getRoot();
+    	TreeNode root = (TreeNode) fileTree.getModel().getRoot();
 
     	// 遍历根节点查找匹配的磁盘
     	for (int i = 0; i < root.getChildCount(); i++) {
@@ -906,15 +457,15 @@ public class FileExplorerWindow extends JFrame {
     		if (child.getFile().equals(targetFile)) {
     			// 找到匹配，设置选中路径
     			TreePath path = new TreePath(new Object[]{root, child});
-    			trFileTree.setSelectionPath(path);
-    			trFileTree.scrollPathToVisible(path);
+    			fileTree.setSelectionPath(path);
+    			fileTree.scrollPathToVisible(path);
     			return;
     		}
     	}
 
     	// 未找到匹配，选择第一个
-    	if (trFileTree.getRowCount() > 0) {
-    		trFileTree.setSelectionRow(0);
+    	if (fileTree.getRowCount() > 0) {
+    		fileTree.setSelectionRow(0);
     	}
     }
 
@@ -952,7 +503,8 @@ public class FileExplorerWindow extends JFrame {
      * @param file 要验证的文件
      * @return true 可以跳转，false 不可以
      */
-    private boolean canNavigateToFile(File file) {
+    @Override
+    public boolean canNavigateToFile(File file) {
         if (file == null || !file.exists()) {
             return false;
         }
@@ -960,19 +512,20 @@ public class FileExplorerWindow extends JFrame {
         return parentDir != null && parentDir.exists();
     }
 
-    private void updateTable(File file, Boolean isBack){
+    @Override
+    public void updateTable(File file, Boolean isBack){
         isSearchMode = false;
         String path = file.getAbsolutePath();
         if (path == null)
             return;
-        tfDir.setText(path);
+        directoryField.setText(path);
         currentDir = file;
         if (!isBack){
-            stackFile.push(file);
+            navigationStack.push(file);
         }
 
         final File targetFile = file;
-        
+
         SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
             @Override
             protected File[] doInBackground() {
@@ -1003,7 +556,7 @@ public class FileExplorerWindow extends JFrame {
         String path = file.getAbsolutePath();
         if (path == null)
             return;
-        tfDir.setText(path);
+        directoryField.setText(path);
         currentDir = file;
 
         // 重建完整的目录层级路径（从根目录到目标目录）
@@ -1017,9 +570,9 @@ public class FileExplorerWindow extends JFrame {
         }
 
         // 反向压入栈（从根到目标目录）
-        stackFile.clear();
+        navigationStack.clear();
         while (!tempStack.isEmpty()) {
-            stackFile.push(tempStack.pop());
+            navigationStack.push(tempStack.pop());
         }
 
         final File targetFile = file;
@@ -1045,11 +598,11 @@ public class FileExplorerWindow extends JFrame {
         worker.execute();
     }
 
-    private void AddComponentListener(){
-        trFileTree.addTreeSelectionListener(new TreeSelectionListener(){
+    private void addComponentListeners(){
+        fileTree.addTreeSelectionListener(new TreeSelectionListener(){
             @Override
             public void valueChanged(TreeSelectionEvent e) {
-                JTree tree = (JTree)e.getSource();
+                javax.swing.JTree tree = (javax.swing.JTree)e.getSource();
                 FileTreeNode selectNode = (FileTreeNode)tree.getLastSelectedPathComponent();
                 if (selectNode != null){
                     File file = selectNode.getFile();
@@ -1058,12 +611,12 @@ public class FileExplorerWindow extends JFrame {
             }
         });
 
-        trFileTree.addMouseListener(new MouseAdapter() {
+        fileTree.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 1)
                 {
-                    JTree tree = (JTree)e.getSource();
+                    javax.swing.JTree tree = (javax.swing.JTree)e.getSource();
                     FileTreeNode selectNode = (FileTreeNode)tree.getLastSelectedPathComponent();
                     if (selectNode != null){
                         File file = selectNode.getFile();
@@ -1073,7 +626,7 @@ public class FileExplorerWindow extends JFrame {
             }
         });
 
-        tbFile.addMouseListener(new MouseAdapter() {
+        fileTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 FileTable fileTable = (FileTable)e.getSource();
@@ -1084,9 +637,9 @@ public class FileExplorerWindow extends JFrame {
                 if (model != null && model.isParentRow(row)) {
                     // 双击虚拟行触发返回上级
                     if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
-                        if (stackFile.size() > 1) {
-                            stackFile.pop();
-                            updateTable(stackFile.peek(), true);
+                        if (navigationStack.size() > 1) {
+                            navigationStack.pop();
+                            updateTable(navigationStack.peek(), true);
                         }
                     }
                     return;
@@ -1094,9 +647,6 @@ public class FileExplorerWindow extends JFrame {
 
                 File file = (File) fileTable.getValueAt(row, 0);
                 if (e.getClickCount() == 1){
-//                	TreePath path =trFileTree.getSelectionPath();
-//                	path.pathByAddingChild(new FileTreeNode(file));
-//                	trFileTree.setSelectionPath(path);
                 } else if (e.getClickCount() == 2){
                 	if(FileUtils.isVideoFile(file)) {
                 		String filePath = file.getAbsolutePath();
@@ -1123,7 +673,7 @@ public class FileExplorerWindow extends JFrame {
                 	// 仅对文件夹显示"文件夹名转简体"菜单项
                 	mRenameToSimple.setVisible(file.isDirectory());
 
-                	menu.show(tbFile, e.getX(), e.getY());
+                	menu.show(fileTable, e.getX(), e.getY());
                 }
             }
         });
@@ -1131,16 +681,16 @@ public class FileExplorerWindow extends JFrame {
         btnBack.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                if (stackFile.size()>1) {
-                    stackFile.pop();
-                    updateTable(stackFile.peek(), true);
+                if (navigationStack.size()>1) {
+                    navigationStack.pop();
+                    updateTable(navigationStack.peek(), true);
                 }
             }
         });
         btnCleanSearch.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				tfSearch.setText("");
+				searchField.setText("");
 				if(currentDir!=null) {
 					updateTable(currentDir,false);
 				}
@@ -1152,8 +702,8 @@ public class FileExplorerWindow extends JFrame {
 				performSearch();
 			}
 		});
-        
-        tfSearch.addKeyListener(new KeyAdapter() {
+
+        searchField.addKeyListener(new KeyAdapter() {
 			@Override
 			public void keyPressed(KeyEvent e) {
 				if (e.getKeyCode() == KeyEvent.VK_ENTER) {
@@ -1163,7 +713,7 @@ public class FileExplorerWindow extends JFrame {
 		});
 
         // 添加搜索框文本变化监听（实时搜索）
-        tfSearch.getDocument().addDocumentListener(new DocumentListener() {
+        searchField.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
                 restartSearchTimer();
@@ -1185,17 +735,17 @@ public class FileExplorerWindow extends JFrame {
              * 重新启动搜索定时器（防抖处理）
              */
             private void restartSearchTimer() {
-                if (chkRealtimeSearch.isSelected()) {
+                if (realtimeSearchCheckBox.isSelected()) {
                     searchTimer.restart();
                 }
             }
         });
 
         btnSearchDir.addActionListener(new ActionListener() {
-			
+
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				String test = tfSearch.getText();
+				String test = searchField.getText();
 				if(StringUtils.isNotBlank(test)) {
 					List<File> files = DiskManager.getInstance().searchAllDirs(test);
 					updateSearchResult(files);
@@ -1203,20 +753,20 @@ public class FileExplorerWindow extends JFrame {
 			}
 		});
 
-        chkVideoOnly.addActionListener(new ActionListener() {
+        videoOnlyCheckBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                videoOnly = chkVideoOnly.isSelected();
+                videoOnly = videoOnlyCheckBox.isSelected();
                 if (currentDir != null) {
                     updateTable(currentDir, true);
                 }
             }
         });
 
-        chkShowAllDisks.addActionListener(new ActionListener() {
+        showAllDisksCheckBox.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                boolean newShowAllDisks = chkShowAllDisks.isSelected();
+                boolean newShowAllDisks = showAllDisksCheckBox.isSelected();
                 // 仅当状态真正改变时才刷新
                 if (newShowAllDisks != showAllDisks) {
                     showAllDisks = newShowAllDisks;
@@ -1236,9 +786,9 @@ public class FileExplorerWindow extends JFrame {
     private void initComponent(){
         initData();
         createComponent();
-        AddComponentListener();
+        addComponentListeners();
 
-        spTable = new JScrollPane(tbFile);
+        spTable = new JScrollPane(fileTable);
         spTable.setBackground(Color.white);
         // 设置table 列宽
         DefaultTreeModel dfTreeModel = new DefaultTreeModel(fileTreeRoot) {
@@ -1253,79 +803,79 @@ public class FileExplorerWindow extends JFrame {
                 return ((File)treeNode.getUserObject()).isFile();
             }
         };
-        trFileTree.setModel(dfTreeModel);
-        trFileTree.setCellRenderer(new FileTreeCellRenderer());
-        trFileTree.setRootVisible(false);
-        trFileTree.setSelectionRow(0);
+        fileTree.setModel(dfTreeModel);
+        fileTree.setCellRenderer(new FileTreeCellRenderer());
+        fileTree.setRootVisible(false);
+        fileTree.setSelectionRow(0);
 
-        JScrollPane scroll = new JScrollPane(trFileTree);
+        JScrollPane scroll = new JScrollPane(fileTree);
         scroll.setLayout(new ScrollPaneLayout());
         scroll.getViewport().setBackground(Color.WHITE);
-        
-        spIndexInfo = new JScrollPane(pnlIndexInfo);
+
+        spIndexInfo = new JScrollPane(indexInfoPanel);
         spIndexInfo.setBackground(Color.white);
         spIndexInfo.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
         spIndexInfo.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
         spIndexInfo.setPreferredSize(new Dimension(200, 150));
         spIndexInfo.setMinimumSize(new Dimension(200, 100));
-        
-        spLeft.setTopComponent(scroll);
-        spLeft.setBottomComponent(spIndexInfo);
-        spLeft.setResizeWeight(0.8);
 
-        JPanel pnlLeftTop = new JPanel();
-        pnlLeftTop.setLayout(new GridBagLayout());
-        pnlLeftTop.add(btnRefresh, new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.WEST,
+        leftSplitPane.setTopComponent(scroll);
+        leftSplitPane.setBottomComponent(spIndexInfo);
+        leftSplitPane.setResizeWeight(0.8);
+
+        JPanel leftPanelTop = new JPanel();
+        leftPanelTop.setLayout(new GridBagLayout());
+        leftPanelTop.add(btnRefresh, new GridBagConstraints(0, 0, 1, 1, 0.0, 0.0, GridBagConstraints.WEST,
                 GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
-        pnlLeftTop.add(chkShowAllDisks, new GridBagConstraints(1, 0, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
+        leftPanelTop.add(showAllDisksCheckBox, new GridBagConstraints(1, 0, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
                 GridBagConstraints.HORIZONTAL, new Insets(5, 5, 5, 5), 0, 0));
 
-        pnlLeft.setLayout(new GridBagLayout());
-        pnlLeft.add(pnlLeftTop, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.0, GridBagConstraints.EAST,
+        leftPanel.setLayout(new GridBagLayout());
+        leftPanel.add(leftPanelTop, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.0, GridBagConstraints.EAST,
                 GridBagConstraints.HORIZONTAL, new Insets(0, 0, 0, 0), 0, 0));
-        pnlLeft.add(spLeft, new GridBagConstraints(0, 1, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
+        leftPanel.add(leftSplitPane, new GridBagConstraints(0, 1, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
-        pnlRight.setLayout(new GridBagLayout());
-        pnlRight.add(spTable,new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
+        rightPanel.setLayout(new GridBagLayout());
+        rightPanel.add(spTable,new GridBagConstraints(0, 0, 1, 1, 1.0, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlRight.add(lblStatusBar, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
+        rightPanel.add(lblStatusBar, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.0, GridBagConstraints.WEST,
                 GridBagConstraints.HORIZONTAL, new Insets(2, 5, 2, 5), 0, 0));
 
         //搜索
-        pnlTop.setLayout(new GridBagLayout());
-        pnlTop.add(btnSearch, new GridBagConstraints(0, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
+        topPanel.setLayout(new GridBagLayout());
+        topPanel.add(btnSearch, new GridBagConstraints(0, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlTop.add(btnSearchDir,new GridBagConstraints(1, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
+        topPanel.add(btnSearchDir,new GridBagConstraints(1, 0, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(1, 0, 0, 0), 0, 0));
-        pnlTop.add(tfSearch,new GridBagConstraints(2, 0, 1, 1, 0.82, 1.0, GridBagConstraints.EAST,
+        topPanel.add(searchField,new GridBagConstraints(2, 0, 1, 1, 0.82, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlTop.add(chkRealtimeSearch, new GridBagConstraints(3, 0, 1, 1, 0.13, 1.0, GridBagConstraints.EAST,
+        topPanel.add(realtimeSearchCheckBox, new GridBagConstraints(3, 0, 1, 1, 0.13, 1.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(0, 5, 0, 0), 0, 0));
-        pnlTop.add(chkVideoOnly, new GridBagConstraints(3, 1, 1, 1, 0.13, 0.0, GridBagConstraints.EAST,
+        topPanel.add(videoOnlyCheckBox, new GridBagConstraints(3, 1, 1, 1, 0.13, 0.0, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(2, 5, 0, 0), 0, 0));
 
 
         //路径
-        pnlTop.add(btnBack, new GridBagConstraints(0, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
+        topPanel.add(btnBack, new GridBagConstraints(0, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-        pnlTop.add(btnCleanSearch, new GridBagConstraints(1, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
-                GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
-
-        pnlTop.add(tfDir,new GridBagConstraints(2, 1, 1, 1, 0.95, 1.0, GridBagConstraints.EAST,
+        topPanel.add(btnCleanSearch, new GridBagConstraints(1, 1, 1, 1, 0.05, 1.0, GridBagConstraints.WEST,
                 GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
 
-        spBottom.setLeftComponent(pnlLeft);
-        spBottom.setRightComponent(pnlRight);
-        pnlLeft.setMinimumSize(new Dimension(200,height));
+        topPanel.add(directoryField,new GridBagConstraints(2, 1, 1, 1, 0.95, 1.0, GridBagConstraints.EAST,
+                GridBagConstraints.BOTH, new Insets(0, 0, 0, 0), 0, 0));
+
+        bottomSplitPane.setLeftComponent(leftPanel);
+        bottomSplitPane.setRightComponent(rightPanel);
+        leftPanel.setMinimumSize(new Dimension(200,height));
 
         Container container = this.getContentPane();
         container.setLayout(new GridBagLayout());
-        container.add(pnlTop, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.05, GridBagConstraints.EAST,
+        container.add(topPanel, new GridBagConstraints(0, 0, 1, 1, 1.0, 0.05, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(2, 0, 0, 0), 0, 0));
-        container.add(spBottom, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.95, GridBagConstraints.EAST,
+        container.add(bottomSplitPane, new GridBagConstraints(0, 1, 1, 1, 1.0, 0.95, GridBagConstraints.EAST,
                 GridBagConstraints.BOTH, new Insets(4, 2, 2, 2), 0, 0));
-        
+
         updateIndexInfo();
 
         // 设置搜索框快捷键
@@ -1343,8 +893,8 @@ public class FileExplorerWindow extends JFrame {
      */
     private void setupSearchShortcuts() {
         // 获取输入映射和动作映射
-        InputMap inputMap = tfSearch.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
-        ActionMap actionMap = tfSearch.getActionMap();
+        InputMap inputMap = searchField.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        ActionMap actionMap = searchField.getActionMap();
 
         // 注册 Ctrl+F: 定位搜索框并选中全部文本
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F, KeyEvent.CTRL_DOWN_MASK), "focusSearch");
@@ -1353,8 +903,8 @@ public class FileExplorerWindow extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                tfSearch.requestFocusInWindow();
-                tfSearch.selectAll();
+                searchField.requestFocusInWindow();
+                searchField.selectAll();
             }
         });
 
@@ -1365,11 +915,11 @@ public class FileExplorerWindow extends JFrame {
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                tfSearch.setText("");
+                searchField.setText("");
                 if(currentDir!=null) {
                     updateTable(currentDir,false);
                 }
-                tfSearch.requestFocusInWindow();  // 保持焦点在搜索框
+                searchField.requestFocusInWindow();  // 保持焦点在搜索框
             }
         });
     }
@@ -1379,11 +929,11 @@ public class FileExplorerWindow extends JFrame {
      * 用于窗口初始化后将焦点定位到搜索框
      */
     public void focusSearchField() {
-        tfSearch.requestFocusInWindow();
+        searchField.requestFocusInWindow();
     }
 
-    private int width=1024;
-    private int height=768;
+    private int width = AppConfig.WINDOW_WIDTH;
+    private int height = AppConfig.WINDOW_HEIGHT;
     public FileExplorerWindow(){
         super("视频文件浏览器");
         initComponent();
@@ -1399,8 +949,8 @@ public class FileExplorerWindow extends JFrame {
             }
         });
         if(DiskManager.getInstance().listDisk().size()<1) {
-        	JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAF_FILE+" 文件", "警告", MessageType.INFO.ordinal());
+        	JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  "+Disk.FLAG_FILE+" 文件", "警告", MessageType.INFO.ordinal());
         }
     }
-    
+
 }

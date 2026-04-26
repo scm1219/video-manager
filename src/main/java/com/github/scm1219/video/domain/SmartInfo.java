@@ -9,8 +9,10 @@ import java.util.Map;
 import org.apache.commons.lang3.StringUtils;
 
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 
 @Data
+@Slf4j
 public class SmartInfo {
 
 	private static final Map<String, String> smartInfo = new HashMap<>();
@@ -91,8 +93,7 @@ public class SmartInfo {
 					f.set(info, values.get(i));
 				}
 			} catch (Exception e) {
-				System.err.println(line);
-				e.printStackTrace();
+				log.error("解析 SMART 信息行失败: {}", line, e);
 			}
 		}
 		return info;

@@ -35,7 +35,7 @@ public class DiskManager {
 		try {
 			Class.forName("org.sqlite.JDBC");
 		} catch (ClassNotFoundException e) {
-			e.printStackTrace();
+			log.error("SQLite JDBC 驱动加载失败", e);
 		}
 		log.info("sqlite jdbc 驱动加载完成");
 	}
@@ -51,7 +51,7 @@ public class DiskManager {
 					disks.add(disk);
 				}
 			} else {
-				log.info("因未发现" + Disk.FLAF_FILE + "文件，忽略磁盘" + disk.getPath());
+				log.info("因未发现" + Disk.FLAG_FILE + "文件，忽略磁盘" + disk.getPath());
 			}
 		}
 
@@ -60,8 +60,8 @@ public class DiskManager {
 			public int compare(Disk o1, Disk o2) {
 
 				String displayName1 = fileSystemView.getSystemDisplayName(o1.getRoot());
-				String dispalyName2 = fileSystemView.getSystemDisplayName(o2.getRoot());
-				return displayName1.compareTo(dispalyName2);
+				String displayName2 = fileSystemView.getSystemDisplayName(o2.getRoot());
+				return displayName1.compareTo(displayName2);
 			}
 		});
 	}
