@@ -58,24 +58,28 @@ public class Disk {
 	}
 
 	private boolean findVideoDir(File parent, List<File> result, ProgressCallback callback, boolean isTop) {
-		File[] subDirs = parent.listFiles();
-		boolean currentVideo = hasVideoFiles(parent);
+		File[] files = parent.listFiles();
+		boolean currentVideo = false;
 
-		if (subDirs != null) {
-			for (File subDir : subDirs) {
-				// 检查是否取消（每个目录都检查）
-				if (index.isCancelled()) {
-					log.info("已经取消检查");
-					throw new IndexCancelledException();
+		if (files != null) {
+			for (File file : files) {
+				// 检查当前目录是否包含视频文件
+				if (!file.isDirectory() && FileUtils.isVideoFile(file)) {
+					currentVideo = true;
 				}
 
-				if (callback != null && isTop) {
-					callback.update(0, "检查" + subDir.getAbsolutePath() + "是否需要扫描");
-				}
-				if (subDir.isDirectory()) {
-					// 先遍历子目录是否包含视频
-					boolean subHasVideo = findVideoDir(subDir, result, callback, false);
-					if (subHasVideo) {
+				if (file.isDirectory()) {
+					// 检查是否取消（每个目录都检查）
+					if (index.isCancelled()) {
+						log.info("已经取消检查");
+						throw new IndexCancelledException();
+					}
+
+					if (callback != null && isTop) {
+						callback.update(0, "检查" + file.getAbsolutePath() + "是否需要扫描");
+					}
+					// 递归检查子目录
+					if (findVideoDir(file, result, callback, false)) {
 						currentVideo = true;
 					}
 				}
@@ -85,24 +89,6 @@ public class Disk {
 			result.add(parent);
 		}
 		return currentVideo;
-	}
-
-	/**
-	 * 判断当前文件夹下有无视频文件
-	 *
-	 * @param dir
-	 * @return
-	 */
-	private boolean hasVideoFiles(File dir) {
-		File[] listFiles = dir.listFiles();
-		if (listFiles != null) {
-			for (File file : listFiles) {
-				if (FileUtils.isVideoFile(file)) {
-					return true;
-				}
-			}
-		}
-		return false;
 	}
 
 	public List<File> listVideoDir(ProgressCallback callback) {

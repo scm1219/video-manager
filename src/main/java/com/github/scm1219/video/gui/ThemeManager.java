@@ -9,6 +9,7 @@ import java.util.Properties;
 import javax.swing.UnsupportedLookAndFeelException;
 
 import com.formdev.flatlaf.FlatDarkLaf;
+import lombok.extern.slf4j.Slf4j;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 
@@ -22,6 +23,7 @@ import com.formdev.flatlaf.FlatLightLaf;
  * @author FlatLaf Integration
  * @version 1.0.0
  */
+@Slf4j
 public class ThemeManager {
 
     private static ThemeManager instance;
@@ -79,7 +81,7 @@ public class ThemeManager {
                 config.load(fis);
             } catch (IOException e) {
                 // 配置文件读取失败，使用默认值
-                System.err.println("读取主题配置失败: " + e.getMessage());
+                log.error("读取主题配置失败", e);
             }
         }
     }
@@ -97,7 +99,7 @@ public class ThemeManager {
             config.store(fos, "Theme Configuration\nAvailable values: light, dark, auto");
             return true;
         } catch (IOException e) {
-            System.err.println("保存主题配置失败: " + e.getMessage());
+            log.error("保存主题配置失败", e);
             return false;
         }
     }
@@ -144,13 +146,13 @@ public class ThemeManager {
 
             return true;
         } catch (Exception e) {
-            System.err.println("应用主题失败: " + e.getMessage());
+            log.error("应用主题失败", e);
             // 回退到系统默认 Look and Feel
             try {
                 javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
             } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
                     | UnsupportedLookAndFeelException ex) {
-                System.err.println("回退到系统主题失败: " + ex.getMessage());
+                log.error("回退到系统主题失败", ex);
             }
             return false;
         }

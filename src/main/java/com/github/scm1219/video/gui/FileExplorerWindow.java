@@ -18,6 +18,7 @@ import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
@@ -254,12 +255,7 @@ public class FileExplorerWindow extends JFrame
         }
     };
 
-    public static final Comparator<Long> FILE_SIZE_COMPARATOR = new Comparator<Long>() {
-        @Override
-        public int compare(Long size1, Long size2) {
-            return Long.compare(size1, size2);
-        }
-    };
+    public static final Comparator<Long> FILE_SIZE_COMPARATOR = Long::compare;
 
     /**
      * 执行文件搜索（供按钮、键盘、实时搜索调用）
@@ -308,25 +304,33 @@ public class FileExplorerWindow extends JFrame
      * @param showParentRow 是否显示"返回上一级"虚拟行
      */
     private void setFileTable(File[] files, boolean showParentRow) {
-    	List<File> fileList = new java.util.ArrayList<File>();
-        for (int i = 0; i < files.length; i++){
-            if (videoOnly) {
-                if (files[i].isDirectory() || FileUtils.isVideoFile(files[i])) {
-                    fileList.add(files[i]);
-                }
-            } else {
-                fileList.add(files[i]);
-            }
-        }
-        Collections.sort(fileList, FILE_COMPARATOR);
-        Object[][] fileData = new Object[fileList.size()][5];
-        for (int i = 0; i < fileData.length; i++){
-            for (int j = 0; j < 5; j++){
-                fileData[i][j] = fileList.get(i);
-            }
-        }
+    	List<File> fileList = new ArrayList<>();
+	        for (File file : files) {
+	            if (videoOnly) {
+	                if (file.isDirectory() || FileUtils.isVideoFile(file)) {
+	                    fileList.add(file);
+	                }
+	            } else {
+	                fileList.add(file);
+	            }
+	        }
+	        Collections.sort(fileList, FILE_COMPARATOR);
+	        FileTableModel model = new FileTableModel(fileList, showParentRow);
 
-        FileTableModel model = new FileTableModel(fileData, showParentRow);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         fileTable.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
         sort.setComparator(0, FILE_COMPARATOR);

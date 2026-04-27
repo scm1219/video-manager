@@ -1,16 +1,16 @@
 package com.github.scm1219.video.gui;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.Icon;
 import javax.swing.filechooser.FileSystemView;
 
 public class IconCache {
     private static final int MAX_CACHE_SIZE = 2000;
-    private static final Map<String, Icon> iconCache = new HashMap<>();
-    private static final Map<String, String> displayNameCache = new HashMap<>();
-    private static final Map<String, String> typeDescriptionCache = new HashMap<>();
+    private static final Map<String, Icon> iconCache = new ConcurrentHashMap<>();
+    private static final Map<String, String> displayNameCache = new ConcurrentHashMap<>();
+    private static final Map<String, String> typeDescriptionCache = new ConcurrentHashMap<>();
     private static final FileSystemView fileSystemView = FileSystemView.getFileSystemView();
 
     public static Icon getSystemIcon(File file) {

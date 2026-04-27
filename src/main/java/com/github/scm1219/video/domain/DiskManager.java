@@ -3,8 +3,9 @@ package com.github.scm1219.video.domain;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import javax.swing.filechooser.FileSystemView;
 
@@ -16,18 +17,16 @@ import lombok.extern.slf4j.Slf4j;
 public class DiskManager {
 
 	private static DiskManager instance = new DiskManager();
-
 	private static FileSystemView fileSystemView = FileSystemView.getFileSystemView();
 
-	public static DiskManager getInstance() {
-		// code warm up
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				ZhConverterUtil.toSimple("test");
-			}
-		}).start();
+	// 预热 OpenCC4j（首次调用有初始化开销，避免用户搜索时等待）
+	static {
+		Thread warmupThread = new Thread(() -> ZhConverterUtil.toSimple("test"));
+		warmupThread.setDaemon(true);
+		warmupThread.start();
+	}
 
+	public static DiskManager getInstance() {
 		return instance;
 	}
 
@@ -40,42 +39,34 @@ public class DiskManager {
 		log.info("sqlite jdbc 驱动加载完成");
 	}
 
-	private List<Disk> disks = new ArrayList<>();
+	private final List<Disk> disks = new ArrayList<>();
+	private final Map<String, Disk> diskMap = new HashMap<>();
 
 	public void loadDisks() {
+		diskMap.clear();
 		File[] f = File.listRoots();
-		for (int i = 0; i < f.length; i++) {
-			Disk disk = new Disk(f[i]);
+		for (File file : f) {
+			Disk disk = new Disk(file);
 			if (disk.needIndex()) {
 				if (!disks.contains(disk)) {
 					disks.add(disk);
+					diskMap.put(disk.getPath().substring(0, 2).toUpperCase(), disk);
 				}
 			} else {
 				log.info("因未发现" + Disk.FLAG_FILE + "文件，忽略磁盘" + disk.getPath());
 			}
 		}
-
-		Collections.sort(disks, new Comparator<Disk>() {
-			@Override
-			public int compare(Disk o1, Disk o2) {
-
-				String displayName1 = fileSystemView.getSystemDisplayName(o1.getRoot());
-				String displayName2 = fileSystemView.getSystemDisplayName(o2.getRoot());
-				return displayName1.compareTo(displayName2);
-			}
+		Collections.sort(disks, (o1, o2) -> {
+			String d1 = fileSystemView.getSystemDisplayName(o1.getRoot());
+			String d2 = fileSystemView.getSystemDisplayName(o2.getRoot());
+			return d1.compareTo(d2);
 		});
 	}
 
 	public Disk findDisk(File file) {
-		// 获取文件的绝对路径
-		String filePath = file.getAbsolutePath();
-
-		for (Disk disk : disks) {
-			// 检查文件路径是否以该磁盘根路径开头
-			String rootPath = disk.getRoot().getAbsolutePath();
-			if (filePath.startsWith(rootPath)) {
-				return disk;
-			}
+		String path = file.getAbsolutePath();
+		if (path.length() >= 2) {
+			return diskMap.get(path.substring(0, 2).toUpperCase());
 		}
 		return null;
 	}
@@ -99,7 +90,6 @@ public class DiskManager {
 	}
 
 	public List<Disk> listDisk() {
-
 		return Collections.unmodifiableList(disks);
 	}
 
@@ -107,5 +97,4 @@ public class DiskManager {
 		disks.clear();
 		loadDisks();
 	}
-
 }
