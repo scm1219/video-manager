@@ -50,8 +50,8 @@ public class DiskManager {
 			if (disk.needIndex()) {
 				if (!disks.contains(disk)) {
 					disks.add(disk);
-					diskMap.put(disk.getPath().substring(0, 2).toUpperCase(), disk);
 				}
+				diskMap.put(disk.getPath().substring(0, 2).toUpperCase(), disk);
 			} else {
 				log.info("因未发现" + Disk.FLAG_FILE + "文件，忽略磁盘" + disk.getPath());
 			}

@@ -33,10 +33,10 @@ public class TreeContextMenu {
 	public void updateMenuState(FileTreeNode fileTreeNode) {
 		File file = fileTreeNode.getFile();
 		Disk disk = DiskManager.getInstance().findDisk(file);
-		boolean isIndexed = fileTreeNode.isIndexed();
+		boolean isIndexed = disk != null;
 
-		mEchoIndexInfo.setEnabled(isIndexed && disk != null && disk.getIndex().exists());
-		mCreateIndex.setEnabled(isIndexed && disk != null);
+		mEchoIndexInfo.setEnabled(isIndexed && disk.getIndex().exists());
+		mCreateIndex.setEnabled(isIndexed);
 		mCreateNeedIndexFile.setEnabled(!isIndexed);
 		mShowSmart.setEnabled(true);
 	}

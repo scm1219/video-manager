@@ -9,75 +9,75 @@ import javax.swing.tree.DefaultMutableTreeNode;
 import com.github.scm1219.video.gui.IconCache;
 
 public class FileTreeNode extends DefaultMutableTreeNode {
-    private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 1L;
 
-    static FileSystemView fileSystemView = FileSystemView.getFileSystemView();
+	static FileSystemView fileSystemView = FileSystemView.getFileSystemView();
 
-    private boolean isInit;
-    private boolean isDummyRoot;
-    private String fileName;
-    private Icon fileIcon;
-    private boolean isIndexed;
+	private boolean isInit;
+	private boolean isDummyRoot;
+	private String fileName;
+	private Icon fileIcon;
+	private boolean isIndexed;
 
-    public File getFile() {
-        return file;
-    }
+	public File getFile() {
+		return file;
+	}
 
-    private File file;
+	private File file;
 
-    public FileTreeNode(File file) {
-        this(file, false, true);
-    }
+	public FileTreeNode(File file) {
+		this(file, false, true);
+	}
 
-    public FileTreeNode(File file, boolean isDummyRoot) {
-        this(file, isDummyRoot, true);
-    }
+	public FileTreeNode(File file, boolean isDummyRoot) {
+		this(file, isDummyRoot, true);
+	}
 
-    public FileTreeNode(File file, boolean isDummyRoot, boolean allowsChildren) {
-        super(file, allowsChildren);
-        this.file = file;
-        this.fileName = IconCache.getSystemDisplayName(file);
-        this.fileIcon = IconCache.getSystemIcon(file);
-        this.isDummyRoot = isDummyRoot;
-    }
+	public FileTreeNode(File file, boolean isDummyRoot, boolean allowsChildren) {
+		super(file, allowsChildren);
+		this.file = file;
+		this.fileName = IconCache.getSystemDisplayName(file);
+		this.fileIcon = IconCache.getSystemIcon(file);
+		this.isDummyRoot = isDummyRoot;
+	}
 
-    public boolean isInit() {
-        return isInit;
-    }
+	public boolean isInit() {
+		return isInit;
+	}
 
-    public void setInit(boolean init) {
-        isInit = init;
-    }
+	public void setInit(boolean init) {
+		isInit = init;
+	}
 
-    public boolean isDummyRoot() {
-        return isDummyRoot;
-    }
+	public boolean isDummyRoot() {
+		return isDummyRoot;
+	}
 
-    public void setDummyRoot(boolean dummyRoot) {
-        isDummyRoot = dummyRoot;
-    }
+	public void setDummyRoot(boolean dummyRoot) {
+		isDummyRoot = dummyRoot;
+	}
 
-    public String getFileName() {
-        return fileName;
-    }
+	public String getFileName() {
+		return fileName;
+	}
 
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
-    }
+	public void setFileName(String fileName) {
+		this.fileName = fileName;
+	}
 
-    public Icon getFileIcon() {
-        return fileIcon;
-    }
+	public Icon getFileIcon() {
+		return fileIcon;
+	}
 
-    public void setFileIcon(Icon fileIcon) {
-        this.fileIcon = fileIcon;
-    }
+	public void setFileIcon(Icon fileIcon) {
+		this.fileIcon = fileIcon;
+	}
 
-    public boolean isIndexed() {
-        return isIndexed;
-    }
+	public boolean isIndexed() {
+		return isIndexed;
+	}
 
-    public void setIndexed(boolean indexed) {
-        isIndexed = indexed;
-    }
+	public void setIndexed(boolean indexed) {
+		isIndexed = indexed;
+	}
 }

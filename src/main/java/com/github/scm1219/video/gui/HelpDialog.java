@@ -116,17 +116,17 @@ public class HelpDialog {
 			<html>
 			<div style='text-align: left; padding: 0px; font-family: Microsoft YaHei, Arial;'>
 			<h2 style='color: %s; margin: 5px 0;'>视频文件管理器</h2>
-            <p style='font-size: 10px; margin: 3px 0; color: %s;'>
+			<p style='font-size: 10px; margin: 3px 0; color: %s;'>
 			针对多移动硬盘的视频文件快速查找与管理工具
 			</p>
 			<p style='font-size: 10px; margin: 3px 0; color: %s;'>
 			<b>版本:</b> %s
 			</p>
-            <p style='font-size: 10px; margin: 3px 0; color: %s;'>
+			<p style='font-size: 10px; margin: 3px 0; color: %s;'>
 			<b>作者:</b> scm1219
 			</p>
 			<p style='font-size: 10px; margin: 3px 0;'>
-            <b>地址:</b>
+			<b>地址:</b>
 			<a href='https://github.com/scm1219/video-manager'
 			   style='color: %s; text-decoration: none;'>
 			   https://github.com/scm1219/video-manager
