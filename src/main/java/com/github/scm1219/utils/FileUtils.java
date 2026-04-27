@@ -6,15 +6,16 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class FileUtils {
 
-	private static final String[] VIDEO_EXTENSIONS = {
+	private static final Set<String> VIDEO_EXTENSIONS = Set.of(
 		".mp4", ".mkv", ".rm", ".rmvb", ".wmv", ".flv", ".ogm"
-	};
+	);
 
 	/**
 	 * @param dirName "G:\\anime\\ddd\\S2"
@@ -43,12 +44,9 @@ public class FileUtils {
 
 	public static boolean isVideoFile(File f) {
 		String fileName = f.getName().toLowerCase();
-		for (String ext : VIDEO_EXTENSIONS) {
-			if (fileName.endsWith(ext)) {
-				return true;
-			}
-		}
-		return false;
+		int dotIndex = fileName.lastIndexOf('.');
+		if (dotIndex < 0) return false;
+		return VIDEO_EXTENSIONS.contains(fileName.substring(dotIndex));
 	}
 
 	public static String formatFileSize(long fileS) {
@@ -104,7 +102,17 @@ public class FileUtils {
 			ProcessBuilder pb = new ProcessBuilder(command);
 			pb.redirectError(ProcessBuilder.Redirect.DISCARD);
 			pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
-			pb.start();
+			Process process = pb.start();
+			Thread cleanup = new Thread(() -> {
+				try {
+					process.waitFor();
+				} catch (InterruptedException e) {
+					process.destroyForcibly();
+					Thread.currentThread().interrupt();
+				}
+			});
+			cleanup.setDaemon(true);
+			cleanup.start();
 		} catch (Exception ex) {
 			log.error("执行命令失败: {}", String.join(" ", command), ex);
 		}

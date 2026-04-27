@@ -65,12 +65,9 @@ public class IndexRepository {
 	 * @param conn 数据库连接（由调用方管理）
 	 * @throws Exception SQL 执行失败时抛出
 	 */
-	public void createSchema(Connection conn) throws Exception {
+public void createSchema(Connection conn) throws Exception {
+		ensureSchema(conn);
 		try (Statement stmt = conn.createStatement()) {
-			stmt.executeUpdate(
-					"CREATE TABLE files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
-			stmt.executeUpdate("CREATE INDEX idx_filename ON files (fileName)");
-			stmt.executeUpdate("CREATE INDEX idx_dirname ON files (dirName)");
 			stmt.executeQuery("SELECT count(*) FROM files");
 		}
 	}
