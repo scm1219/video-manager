@@ -1,0 +1,277 @@
+{
+  "timestamp": "2026-02-01T11:05:55+08:00",
+  "project": {
+    "name": "video-manager",
+    "type": "Java GUI Application",
+    "description": "移动设备视频文件管理工具",
+    "version": "1.1.0-RELEASE",
+    "jdk": "17",
+    "latestFeatures": [
+      "索引验证和清理（validateAndCleanup）",
+      "单实例锁机制（AppLock + NIO FileLock）",
+      "索引取消功能完善（Index.cancel + IndexCancelledException）",
+      "实时搜索（700ms防抖）",
+      "快捷键支持（Ctrl+F、Alt+W）",
+      "目录级扫描（统计信息）",
+      "主题切换（浅色/深色/跟随系统）",
+      "状态栏显示（文件数量、删除统计）",
+      "虚拟返回上级行",
+      "点击防抖"
+    ]
+  },
+  "structure": {
+    "root": "E:\\work_tools\\video-manager",
+    "modules": [
+      {
+        "path": "src/main/java/com/github/scm1219/video/domain",
+        "name": "领域层 (Domain)",
+        "language": "Java",
+        "entry": "DiskManager.java",
+        "hasTests": false,
+        "hasConfig": false,
+        "documentation": "src/main/java/com/github/scm1219/video/domain/CLAUDE.md",
+        "classes": [
+          "Disk.java",
+          "DiskManager.java",
+          "Index.java",
+          "SmartInfo.java",
+          "IndexCancelledException.java"
+        ],
+        "responsibilities": [
+          "磁盘管理和索引",
+          "SQLite 数据库操作",
+          "文件搜索逻辑",
+          "SMART 信息解析",
+          "目录级索引创建",
+          "索引统计信息",
+          "索引验证和清理（新增）",
+          "索引取消机制（新增）"
+        ],
+        "keyFeatures": [
+          "Index.validateAndCleanup() - 索引验证和清理（行 779-900+）（新增）",
+          "Index.cancel() - 索引取消操作（已实现）（新增）",
+          "IndexCancelledException - 索引取消异常类（新增）",
+          "Index.IndexStatistics - 索引统计信息",
+          "Index.findFiles() - 跨磁盘文件搜索",
+          "Disk.performValidateAndCleanup() - 验证清理入口（新增）",
+          "Disk.needIndex() - 检测索引标记文件"
+        ]
+      },
+      {
+        "path": "src/main/java/com/github/scm1219/video/gui",
+        "name": "界面层 (GUI)",
+        "language": "Java",
+        "entry": "FileExplorerWindow.java",
+        "hasTests": false,
+        "hasConfig": true,
+        "configFile": "~/.video-manager/theme.properties",
+        "documentation": "src/main/java/com/github/scm1219/video/gui/CLAUDE.md",
+        "classes": [
+          "FileExplorerWindow.java",
+          "ThemeManager.java",
+          "ClickDebouncer.java",
+          "IconCache.java",
+          "FileExplorerUI.java"
+        ],
+        "responsibilities": [
+          "主窗口和布局",
+          "主题管理",
+          "事件处理",
+          "文件浏览和搜索",
+          "实时搜索防抖",
+          "快捷键注册",
+          "状态栏显示",
+          "索引验证菜单（新增）"
+        ],
+        "keyFeatures": [
+          "FileExplorerWindow - 1057+行主窗口（含实时搜索、快捷键、状态栏、索引验证菜单）",
+          "ThemeManager - FlatLaf主题管理（单例）",
+          "ClickDebouncer - 点击防抖（防止重复打开文件）",
+          "IconCache - 图标缓存（未完全实现）",
+          "validateAndCleanupIndex() - 索引验证菜单动作（新增）"
+        ]
+      },
+      {
+        "path": "src/main/java/com/github/scm1219/video/gui/tree",
+        "name": "树组件 (Tree)",
+        "language": "Java",
+        "entry": "FileTree.java",
+        "hasTests": false,
+        "hasConfig": false,
+        "documentation": "src/main/java/com/github/scm1219/video/gui/tree/CLAUDE.md",
+        "classes": [
+          "FileTree.java",
+          "FileTreeNode.java",
+          "FileTreeCellRenderer.java",
+          "FileUpdateProcesser.java",
+          "IndexValidationProcesser.java"
+        ],
+        "responsibilities": [
+          "文件树显示",
+          "懒加载子目录",
+          "右键菜单",
+          "索引进度窗口",
+          "索引验证进度窗口（新增）"
+        ],
+        "keyFeatures": [
+          "IndexValidationProcesser - 索引验证进度窗口（183行）（新增）",
+          "FileUpdateProcesser - 索引进度窗口（显示统计信息）",
+          "FileTreeCellRenderer - 树节点渲染（使用JPanel+JLabel）",
+          "刷新后自动恢复选中状态",
+          "支持取消操作（新增）"
+        ]
+      },
+      {
+        "path": "src/main/java/com/github/scm1219/video/gui/table",
+        "name": "表格组件 (Table)",
+        "language": "Java",
+        "entry": "FileTable.java",
+        "hasTests": false,
+        "hasConfig": false,
+        "documentation": "src/main/java/com/github/scm1219/video/gui/table/CLAUDE.md",
+        "classes": [
+          "FileTable.java",
+          "FileTableModel.java",
+          "FileTableCellRenderer.java"
+        ],
+        "responsibilities": [
+          "文件表格显示",
+          "列排序",
+          "单元格渲染",
+          "虚拟返回上级行"
+        ],
+        "keyFeatures": [
+          "FileTableModel.isParentRow() - 虚拟行判断",
+          "FileTableCellRenderer - 虚拟行特殊样式",
+          "文件排序（目录优先、文件名/大小排序）"
+        ]
+      },
+      {
+        "path": "src/main/java/com/github/scm1219/utils",
+        "name": "工具类 (Utils)",
+        "language": "Java",
+        "entry": "FileUtils.java",
+        "hasTests": false,
+        "hasConfig": false,
+        "documentation": "src/main/java/com/github/scm1219/utils/CLAUDE.md",
+        "classes": [
+          "FileUtils.java",
+          "DiskUtils.java",
+          "DateUtils.java",
+          "VideoFileFilter.java"
+        ],
+        "responsibilities": [
+          "文件操作",
+          "磁盘信息获取",
+          "日期格式化",
+          "视频文件识别"
+        ],
+        "keyFeatures": [
+          "FileUtils.openDirAndSelectFile() - 打开文件夹并选中文件",
+          "FileUtils.isVideoFile() - 视频文件判断（支持.mp4/.mkv/.rm/.rmvb/.wmv/.flv/.ogm）",
+          "DiskUtils.getSmartInfo() - SMART信息获取（依赖smartctl）",
+          "FileUtils.formetFileSize() - 文件大小格式化（B/K/M/G）"
+        ]
+      },
+      {
+        "path": "src/main/java/com/github/scm1219/video",
+        "name": "主入口 (Main)",
+        "language": "Java",
+        "entry": "VideoManagerApp.java",
+        "hasTests": false,
+        "hasConfig": true,
+        "configFile": "~/.video-manager/.lock",
+        "documentation": null,
+        "classes": [
+          "VideoManagerApp.java",
+          "AppLock.java"
+        ],
+        "responsibilities": [
+          "应用程序入口",
+          "单实例锁管理（新增）",
+          "主题初始化"
+        ],
+        "keyFeatures": [
+          "AppLock - 单实例锁管理（197行）（新增）",
+          "NIO FileLock - OS级别文件锁（新增）",
+          "JVM关闭钩子 - 自动释放锁（新增）",
+          "ThemeManager初始化 - 应用主题配置"
+        ]
+      }
+    ]
+  },
+  "coverage": {
+    "totalJavaFiles": 26,
+    "scannedJavaFiles": 26,
+    "coveragePercent": 100,
+    "testFiles": 3,
+    "testCoverage": "无单元测试框架",
+    "documentationFiles": 5,
+    "ignoredPatterns": [
+      "/target/**",
+      "/.git/**",
+      "/.github/**",
+      "/.vscode/**",
+      "/.idea/**",
+      "/.apt_generated/**",
+      "/.settings/**",
+      "/.classpath",
+      "/.project",
+      "/*.iml",
+      "/bin/**",
+      "/*.properties",
+      "/.zcf/**",
+      "**/CLAUDE.md"
+    ],
+    "ignoredDirectories": [
+      "target",
+      ".git",
+      ".github",
+      ".vscode",
+      ".idea",
+      ".apt_generated",
+      ".settings",
+      "bin",
+      ".zcf"
+    ]
+  },
+  "gaps": [
+    "缺少领域模型的单元测试",
+    "缺少 GUI 组件的集成测试",
+    "缺少性能测试（大规模文件索引）",
+    "缺少国际化支持（当前硬编码中文）",
+    "IconCache 未完全实现"
+  ],
+  "nextSteps": [
+    "补充单元测试（使用 JUnit 5）",
+    "添加 CI/CD 配置（GitHub Actions）",
+    "优化索引性能（考虑多线程）",
+    "扩展支持更多视频格式（.avi、.mov）",
+    "完成 IconCache 实现",
+    "考虑添加索引自动验证功能"
+  ],
+  "truncated": false,
+  "truncatedReason": null,
+  "summary": {
+    "totalFiles": 26,
+    "domainLayer": 5,
+    "guiLayer": 12,
+    "utils": 4,
+    "mainEntry": 2,
+    "tests": 3,
+    "keyChangesSinceLastScan": [
+      "新增 IndexCancelledException 异常类",
+      "新增 IndexValidationProcesser 索引验证窗口",
+      "新增 AppLock 单实例锁管理器",
+      "Index.validateAndCleanup() 索引验证和清理功能",
+      "Index.cancel() 索引取消功能已实现",
+      "Disk.performValidateAndCleanup() 验证清理入口",
+      "FileExplorerWindow 新增索引验证菜单项"
+    ],
+    "completedFeatures": [
+      "索引验证和清理功能",
+      "索引取消机制完善",
+      "单实例锁机制"
+    ]
+  }
+}
