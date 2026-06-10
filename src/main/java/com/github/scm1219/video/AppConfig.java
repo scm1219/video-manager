@@ -1,5 +1,7 @@
 package com.github.scm1219.video;
 
+import java.io.File;
+
 /**
  * 应用程序全局配置常量
  */
@@ -18,7 +20,38 @@ public final class AppConfig {
 
 	// 应用目录
 	public static final String USER_DIR = ".video-manager";
+	public static final String INDEXES_DIR = "indexes";
+	public static final String REGISTRY_FILE = "registry.properties";
 
 	private AppConfig() {
+	}
+
+	/**
+	 * 获取用户应用数据目录（~/.video-manager/）
+	 */
+	public static File getUserDir() {
+		File dir = new File(System.getProperty("user.home"), USER_DIR);
+		if (!dir.exists()) {
+			dir.mkdirs();
+		}
+		return dir;
+	}
+
+	/**
+	 * 获取本地索引缓存目录（~/.video-manager/indexes/）
+	 */
+	public static File getIndexesDir() {
+		File dir = new File(getUserDir(), INDEXES_DIR);
+		if (!dir.exists()) {
+			dir.mkdirs();
+		}
+		return dir;
+	}
+
+	/**
+	 * 获取注册表文件路径（~/.video-manager/registry.properties）
+	 */
+	public static File getRegistryFile() {
+		return new File(getUserDir(), REGISTRY_FILE);
 	}
 }

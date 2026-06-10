@@ -38,6 +38,13 @@ public class Index {
 
 	private final IndexRepository repository;
 
+	/**
+	 * 获取底层 Repository（供 Disk 读取/写入 disk_meta 使用）
+	 */
+	public IndexRepository getRepository() {
+		return repository;
+	}
+
 	private File backupFile;
 
 	private volatile boolean isCancelled = false;
@@ -179,6 +186,9 @@ public class Index {
 			if (!indexFile.exists() || indexFile.length() < 1) {
 				repository.ensureSchema(activeConnection);
 			}
+
+				// 确保磁盘有 UUID（首次索引时自动生成）
+				disk.ensureUuid();
 
 			activeConnection.setAutoCommit(false);
 

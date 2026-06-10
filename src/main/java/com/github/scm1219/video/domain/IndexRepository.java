@@ -56,6 +56,8 @@ public class IndexRepository {
 					"CREATE TABLE IF NOT EXISTS files(fileName varchar(255), dirName varchar(255), filePath varchar(255), dirPath varchar(255))");
 			stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_filename ON files (fileName)");
 			stmt.executeUpdate("CREATE INDEX IF NOT EXISTS idx_dirname ON files (dirName)");
+			stmt.executeUpdate(
+					"CREATE TABLE IF NOT EXISTS disk_meta(key varchar(50) PRIMARY KEY, value varchar(255))");
 		}
 	}
 
@@ -230,6 +232,65 @@ public void createSchema(Connection conn) throws Exception {
 	 */
 	public String getCurrentDrive() {
 		return indexFile.getAbsolutePath().split(":")[0];
+	}
+
+	/**
+	 * 读取 disk_meta 表中的指定键值
+	 *
+	 * @param conn 数据库连接（由调用方管理）
+	 * @param key  键名
+	 * @return 对应的值，不存在返回 null
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public String getMeta(Connection conn, String key) throws Exception {
+		try (PreparedStatement pstmt = conn.prepareStatement("SELECT value FROM disk_meta WHERE key = ?")) {
+			pstmt.setString(1, key);
+			try (ResultSet rs = pstmt.executeQuery()) {
+				if (rs.next()) {
+					return rs.getString(1);
+				}
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * 写入 disk_meta 表的键值对（INSERT OR REPLACE）
+	 *
+	 * @param conn  数据库连接（由调用方管理）
+	 * @param key   键名
+	 * @param value 值
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public void setMeta(Connection conn, String key, String value) throws Exception {
+		try (PreparedStatement pstmt = conn
+				.prepareStatement("INSERT OR REPLACE INTO disk_meta (key, value) VALUES (?, ?)")) {
+			pstmt.setString(1, key);
+			pstmt.setString(2, value);
+			pstmt.executeUpdate();
+		}
+	}
+
+	/**
+	 * 便捷方法：获取磁盘 UUID
+	 *
+	 * @param conn 数据库连接（由调用方管理）
+	 * @return UUID 字符串，不存在返回 null
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public String getDiskUuid(Connection conn) throws Exception {
+		return getMeta(conn, "uuid");
+	}
+
+	/**
+	 * 便捷方法：获取磁盘显示名称
+	 *
+	 * @param conn 数据库连接（由调用方管理）
+	 * @return 磁盘名，不存在返回 null
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public String getDiskName(Connection conn) throws Exception {
+		return getMeta(conn, "disk_name");
 	}
 
 	/**

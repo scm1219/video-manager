@@ -21,7 +21,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Stack;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
@@ -58,6 +60,7 @@ import org.apache.commons.lang3.StringUtils;
 import com.github.scm1219.video.AppConfig;
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
+import com.github.scm1219.video.domain.DiskManager.SearchResultItem;
 import com.github.scm1219.video.gui.table.FileTable;
 import com.github.scm1219.video.gui.table.FileTableModel;
 import com.github.scm1219.video.gui.tree.FileTree;
@@ -257,14 +260,14 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 	private void performSearch() {
 		String keyword = searchField.getText();
 		if (StringUtils.isNotBlank(keyword)) {
-			List<File> files = DiskManager.getInstance().searchAllFiles(keyword);
-			updateSearchResult(files);
+			List<SearchResultItem> results = DiskManager.getInstance().searchAllFilesWithDiskInfo(keyword);
+			updateSearchResultWithDiskInfo(results);
 		}
 	}
 
 	/**
 	 * 更新搜索结果
-	 * 
+	 *
 	 * @param files
 	 */
 	private void updateSearchResult(List<File> files) {
@@ -283,6 +286,44 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 		spTable.getViewport().setViewPosition(new Point(0, 0));
 		// 更新状态栏显示搜索结果数量和已删除数量
 		updateStatusBar(files.size(), true, deletedCount);
+	}
+
+	/**
+	 * 更新搜索结果（携带磁盘名和离线标记）
+	 *
+	 * @param results 搜索结果列表
+	 */
+	private void updateSearchResultWithDiskInfo(List<SearchResultItem> results) {
+		isSearchMode = true;
+
+		// 构建文件列表和元数据
+		List<File> files = new ArrayList<>();
+		List<String> diskNames = new ArrayList<>();
+		Set<Integer> offlineIndexes = new HashSet<>();
+		int onlineCount = 0;
+		int offlineCount = 0;
+
+		for (int i = 0; i < results.size(); i++) {
+			SearchResultItem item = results.get(i);
+			files.add(item.file);
+			diskNames.add(item.diskName);
+			if (!item.online) {
+				offlineIndexes.add(i);
+				offlineCount++;
+			} else {
+				onlineCount++;
+			}
+		}
+
+		File[] fileArray = new File[files.size()];
+		files.toArray(fileArray);
+		setFileTableWithDiskInfo(fileArray, diskNames, offlineIndexes);
+
+		// 搜索后滚动条回到顶部
+		spTable.getViewport().setViewPosition(new Point(0, 0));
+
+		// 更新状态栏
+		updateSearchStatusBar(results.size(), onlineCount, offlineCount);
 	}
 
 	/**
@@ -331,6 +372,55 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 	}
 
 	/**
+	 * 设置表格数据（携带磁盘名和离线标记，用于搜索模式）
+	 *
+	 * @param files          文件数组
+	 * @param diskNames      与 files 平行的磁盘名列表
+	 * @param offlineIndexes 离线文件的索引集合
+	 */
+	private void setFileTableWithDiskInfo(File[] files, List<String> diskNames, Set<Integer> offlineIndexes) {
+		List<File> fileList = new ArrayList<>();
+		List<String> filteredDiskNames = new ArrayList<>();
+		Set<Integer> adjustedOfflineIndexes = new HashSet<>();
+
+		for (int i = 0; i < files.length; i++) {
+			File file = files[i];
+			int newIndex = fileList.size();
+			if (videoOnly) {
+				if (file.isDirectory() || FileUtils.isVideoFile(file)) {
+					fileList.add(file);
+					filteredDiskNames.add(diskNames.get(i));
+					if (offlineIndexes.contains(i)) {
+						adjustedOfflineIndexes.add(newIndex);
+					}
+				}
+			} else {
+				fileList.add(file);
+				filteredDiskNames.add(diskNames.get(i));
+				if (offlineIndexes.contains(i)) {
+					adjustedOfflineIndexes.add(newIndex);
+				}
+			}
+		}
+
+		FileTableModel model = new FileTableModel(fileList, false);
+		model.setSearchMetadata(filteredDiskNames, adjustedOfflineIndexes);
+
+		fileTable.setModel(model);
+		TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
+		sort.setComparator(0, FILE_COMPARATOR);
+		sort.setComparator(3, FILE_SIZE_COMPARATOR);
+		fileTable.setRowSorter(sort);
+		fileTable.getColumnModel().getColumn(0).setPreferredWidth(180);
+		fileTable.getColumnModel().getColumn(1).setPreferredWidth(120);
+		fileTable.getColumnModel().getColumn(2).setPreferredWidth(80);
+		fileTable.getColumnModel().getColumn(3).setPreferredWidth(50);
+		fileTable.getColumnModel().getColumn(4).setPreferredWidth(150);
+		spTable.getViewport().setBackground(Color.white);
+	}
+
+
+	/**
 	 * 更新状态栏显示
 	 * 
 	 * @param count        文件数量
@@ -347,6 +437,23 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 		} else {
 			lblStatusBar.setText("共 " + count + " 个项目");
 		}
+	}
+
+
+	/**
+	 * 更新搜索模式状态栏（显示在线/离线数量）
+	 *
+	 * @param totalCount   总结果数
+	 * @param onlineCount  在线结果数
+	 * @param offlineCount 离线结果数
+	 */
+	private void updateSearchStatusBar(int totalCount, int onlineCount, int offlineCount) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("搜索结果: ").append(totalCount).append(" 个项目");
+		if (offlineCount > 0) {
+			sb.append(" (").append(onlineCount).append(" 个在线, ").append(offlineCount).append(" 个离线)");
+		}
+		lblStatusBar.setText(sb.toString());
 	}
 
 	private File currentDir = null;
