@@ -294,6 +294,27 @@ public void createSchema(Connection conn) throws Exception {
 	}
 
 	/**
+	 * 便捷方法：获取索引最后修改时间
+	 *
+	 * @param conn 数据库连接（由调用方管理）
+	 * @return 最后修改时间字符串，不存在返回 null
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public String getLastModified(Connection conn) throws Exception {
+		return getMeta(conn, "last_modified");
+	}
+
+	/**
+	 * 便捷方法：更新索引最后修改时间为当前时间
+	 *
+	 * @param conn 数据库连接（由调用方管理）
+	 * @throws Exception SQL 执行失败时抛出
+	 */
+	public void updateLastModified(Connection conn) throws Exception {
+		setMeta(conn, "last_modified", java.time.Instant.now().toString());
+	}
+
+	/**
 	 * 预热数据库连接（测试连接是否正常）
 	 */
 	public void warmUp() {

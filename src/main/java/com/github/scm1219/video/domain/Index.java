@@ -241,6 +241,7 @@ public class Index {
 
 				activeConnection.commit();
 				activeConnection.setAutoCommit(true);
+				repository.updateLastModified(activeConnection);
 
 				log.info("整盘索引完成，共扫描 {} 个文件", scannedFileCount.get());
 
@@ -483,6 +484,7 @@ public class Index {
 
 				activeConnection.commit();
 				activeConnection.setAutoCommit(true);
+				repository.updateLastModified(activeConnection);
 
 				if (callback != null) {
 					callback.update(100, "扫描完成！共处理 " + videoFiles.size() + " 个视频文件");
@@ -606,6 +608,7 @@ public class Index {
 						stats.setDeletedCount(invalidPaths.size());
 						repository.deleteByFilePaths(conn, invalidPaths);
 						conn.commit();
+						repository.updateLastModified(conn);
 						log.info("成功删除 {} 条无效记录", invalidPaths.size());
 
 						if (callback != null) {

@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.sql.Connection;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
@@ -133,6 +134,10 @@ public class IndexCacheManager {
 
 	/**
 	 * 将磁盘的索引文件同步到本地缓存目录
+	 * <p>
+	 * 通过比对 disk_meta 中的 last_modified 时间戳判断是否需要复制。
+	 * 如果源索引无变化（时间戳与缓存一致），跳过文件复制。
+	 * </p>
 	 *
 	 * @param disk 已挂载的磁盘对象
 	 */
@@ -149,12 +154,41 @@ public class IndexCacheManager {
 		}
 
 		File targetFile = new File(AppConfig.getIndexesDir(), disk.getUuid() + ".sqlite");
+
+		// 比对 last_modified 时间戳
+		String sourceLastModified = readLastModified(sourceFile);
+		if (targetFile.exists() && sourceLastModified != null) {
+			String cachedLastModified = readLastModified(targetFile);
+			if (sourceLastModified.equals(cachedLastModified)) {
+				log.debug("索引无变化，跳过同步: {}", disk.getDisplayName());
+				return;
+			}
+		}
+
 		try {
 			Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
 			updateRegistry(disk.getUuid(), disk.getDisplayName());
 			log.info("同步索引完成: {} → {}", sourceFile.getAbsolutePath(), targetFile.getAbsolutePath());
 		} catch (IOException e) {
 			log.error("同步索引失败: {}", sourceFile.getAbsolutePath(), e);
+		}
+	}
+
+	/**
+	 * 读取索引文件中 disk_meta 表的 last_modified 值
+	 *
+	 * @param indexFile 索引文件
+	 * @return last_modified 值，不存在或读取失败返回 null
+	 */
+	private String readLastModified(File indexFile) {
+		try {
+			IndexRepository repo = new IndexRepository(indexFile);
+			try (Connection conn = repo.getConnection()) {
+				return repo.getLastModified(conn);
+			}
+		} catch (Exception e) {
+			log.debug("读取 last_modified 失败: {}", indexFile.getAbsolutePath(), e);
+			return null;
 		}
 	}
 

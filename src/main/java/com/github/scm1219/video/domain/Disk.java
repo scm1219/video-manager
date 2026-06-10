@@ -73,6 +73,7 @@ public class Disk {
 				index.getRepository().ensureSchema(conn);
 				index.getRepository().setMeta(conn, "uuid", uuid);
 				index.getRepository().setMeta(conn, "disk_name", getDisplayName());
+				index.getRepository().updateLastModified(conn);
 				log.info("为新磁盘生成 UUID: {} → {}", getDisplayName(), uuid);
 			} catch (Exception e) {
 				log.error("写入磁盘 UUID 失败", e);
