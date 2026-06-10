@@ -107,7 +107,7 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
 				String fileName = extractFileName(file.getPath());
 				String suffix = diskName != null ? "  [" + diskName + " (离线)]" : "  (离线)";
 				this.setText(fileName + suffix);
-				this.setIcon(IconCache.getSystemIcon(file));
+				this.setIcon(IconCache.getSystemIcon(fileSystemView.getDefaultDirectory()));
 			} else {
 				this.setText(IconCache.getSystemDisplayName(file));
 				this.setIcon(IconCache.getSystemIcon(file));
