@@ -12,7 +12,9 @@ import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,6 +47,7 @@ public class IndexCacheManager {
 
     private IndexCacheManager() {
         loadRegistry();
+        cleanupOrphanedEntries();
     }
 
     public static IndexCacheManager getInstance() {
@@ -53,7 +56,7 @@ public class IndexCacheManager {
 
     // ========== 注册表操作 ==========
 
-    private void loadRegistry() {
+    private synchronized void loadRegistry() {
         registry = new Properties();
         File registryFile = AppConfig.getRegistryFile();
         if (registryFile.exists() && registryFile.length() > 0) {
@@ -66,7 +69,7 @@ public class IndexCacheManager {
         }
     }
 
-    private void saveRegistry() {
+    private synchronized void saveRegistry() {
         File registryFile = AppConfig.getRegistryFile();
         try (FileOutputStream fos = new FileOutputStream(registryFile);
                 OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
@@ -82,7 +85,7 @@ public class IndexCacheManager {
      * @param uuid     磁盘 UUID
      * @param diskName 磁盘显示名称
      */
-    public void updateRegistry(String uuid, String diskName) {
+    public synchronized void updateRegistry(String uuid, String diskName) {
         registry.setProperty(uuid + ".name", diskName);
         registry.setProperty(uuid + ".lastSync", java.time.LocalDateTime.now().toString());
         saveRegistry();
@@ -92,7 +95,7 @@ public class IndexCacheManager {
     /**
      * 获取所有已缓存的磁盘 UUID 列表
      */
-    public Set<String> getCachedUuids() {
+    public synchronized Set<String> getCachedUuids() {
         return registry.stringPropertyNames().stream()
                 .filter(key -> key.endsWith(".name"))
                 .map(key -> key.substring(0, key.length() - 5))
@@ -105,7 +108,7 @@ public class IndexCacheManager {
      * @param uuid 磁盘 UUID
      * @return 磁盘名，未找到返回 "未知磁盘"
      */
-    public String getDiskNameByUuid(String uuid) {
+    public synchronized String getDiskNameByUuid(String uuid) {
         return registry.getProperty(uuid + ".name", "未知磁盘");
     }
 
@@ -126,7 +129,7 @@ public class IndexCacheManager {
      * @param uuid 磁盘 UUID
      * @return 最后同步时间字符串，未找到返回 null
      */
-    public String getLastSyncTime(String uuid) {
+    public synchronized String getLastSyncTime(String uuid) {
         return registry.getProperty(uuid + ".lastSync");
     }
 
@@ -155,7 +158,13 @@ public class IndexCacheManager {
 
         File targetFile = new File(AppConfig.getIndexesDir(), disk.getUuid() + ".sqlite");
 
-        // 比对 last_modified 时间戳
+        // 第一层：文件系统时间戳快速预判（避免 JDBC 开销）
+        if (targetFile.exists() && sourceFile.lastModified() == targetFile.lastModified()) {
+            log.debug("文件时间戳相同，跳过同步: {}", disk.getDisplayName());
+            return;
+        }
+
+        // 第二层：SQLite 内 last_modified 精确比对
         String sourceLastModified = readLastModified(sourceFile);
         if (targetFile.exists() && sourceLastModified != null) {
             String cachedLastModified = readLastModified(targetFile);
@@ -165,12 +174,26 @@ public class IndexCacheManager {
             }
         }
 
+        File tempFile = new File(AppConfig.getIndexesDir(), disk.getUuid() + ".sqlite.tmp");
+
         try {
-            Files.copy(sourceFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            // 先写入临时文件，再原子替换，避免崩溃导致缓存损坏
+            Files.copy(sourceFile.toPath(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(tempFile.toPath(), targetFile.toPath(), StandardCopyOption.ATOMIC_MOVE);
+            } catch (java.nio.file.AtomicMoveNotSupportedException e) {
+                // Windows 某些文件系统不支持原子移动，回退到 REPLACE_EXISTING
+                log.debug("不支持 ATOMIC_MOVE，回退到 REPLACE_EXISTING: {}", targetFile.getAbsolutePath());
+                Files.move(tempFile.toPath(), targetFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+            }
             updateRegistry(disk.getUuid(), disk.getDisplayName());
             log.info("同步索引完成: {} → {}", sourceFile.getAbsolutePath(), targetFile.getAbsolutePath());
         } catch (IOException e) {
             log.error("同步索引失败: {}", sourceFile.getAbsolutePath(), e);
+            // 清理可能残留的临时文件
+            if (tempFile.exists()) {
+                tempFile.delete();
+            }
         }
     }
 
@@ -202,21 +225,18 @@ public class IndexCacheManager {
      * @return 搜索结果列表
      */
     public List<CachedSearchResult> searchOfflineFiles(String keyword, Set<String> mountedDiskUuids) {
-        List<CachedSearchResult> allResults = new ArrayList<>();
+        List<CachedSearchResult> allResults = Collections.synchronizedList(new ArrayList<>());
+        // 快照 UUID→名称映射，避免并行线程争抢 synchronized 锁
+        Map<String, String> nameSnapshot = buildDiskNameSnapshot(mountedDiskUuids);
 
-        for (String uuid : getCachedUuids()) {
-            if (mountedDiskUuids != null && mountedDiskUuids.contains(uuid)) {
-                continue;
-            }
-
+        nameSnapshot.entrySet().parallelStream().forEach(entry -> {
+            String uuid = entry.getKey();
+            String diskName = entry.getValue();
             File cachedFile = getCachedIndexFile(uuid);
             if (cachedFile == null) {
-                continue;
+                return;
             }
-
-            String diskName = getDiskNameByUuid(uuid);
             IndexRepository repository = new IndexRepository(cachedFile);
-
             try {
                 List<String> paths = repository.findFilePathsByName(keyword);
                 for (String path : paths) {
@@ -225,7 +245,7 @@ public class IndexCacheManager {
             } catch (Exception e) {
                 log.error("离线搜索失败: uuid={}, diskName={}", uuid, diskName, e);
             }
-        }
+        });
 
         return allResults;
     }
@@ -238,21 +258,17 @@ public class IndexCacheManager {
      * @return 搜索结果列表
      */
     public List<CachedSearchResult> searchOfflineDirs(String keyword, Set<String> mountedDiskUuids) {
-        List<CachedSearchResult> allResults = new ArrayList<>();
+        List<CachedSearchResult> allResults = Collections.synchronizedList(new ArrayList<>());
+        Map<String, String> nameSnapshot = buildDiskNameSnapshot(mountedDiskUuids);
 
-        for (String uuid : getCachedUuids()) {
-            if (mountedDiskUuids != null && mountedDiskUuids.contains(uuid)) {
-                continue;
-            }
-
+        nameSnapshot.entrySet().parallelStream().forEach(entry -> {
+            String uuid = entry.getKey();
+            String diskName = entry.getValue();
             File cachedFile = getCachedIndexFile(uuid);
             if (cachedFile == null) {
-                continue;
+                return;
             }
-
-            String diskName = getDiskNameByUuid(uuid);
             IndexRepository repository = new IndexRepository(cachedFile);
-
             try {
                 List<String> paths = repository.findDistinctDirPathsByName(keyword);
                 for (String path : paths) {
@@ -261,19 +277,65 @@ public class IndexCacheManager {
             } catch (Exception e) {
                 log.error("离线搜索目录失败: uuid={}, diskName={}", uuid, diskName, e);
             }
-        }
+        });
 
         return allResults;
     }
 
+    /**
+     * 构建离线磁盘的 UUID→名称快照（排除已挂载磁盘）
+     * <p>
+     * 在并行搜索前一次性获取所有离线磁盘的名称，避免并行线程反复获取 synchronized 锁。
+     * </p>
+     */
+    private synchronized Map<String, String> buildDiskNameSnapshot(Set<String> mountedDiskUuids) {
+        Map<String, String> snapshot = new HashMap<>();
+        for (String key : registry.stringPropertyNames()) {
+            if (key.endsWith(".name")) {
+                String uuid = key.substring(0, key.length() - 5);
+                if (mountedDiskUuids == null || !mountedDiskUuids.contains(uuid)) {
+                    snapshot.put(uuid, registry.getProperty(key, "未知磁盘"));
+                }
+            }
+        }
+        return snapshot;
+    }
+
     // ========== 清理操作 ==========
+
+    /**
+     * 清理注册表中缓存文件已不存在的孤儿条目
+     * <p>
+     * 在加载注册表时调用，确保注册表与实际缓存文件一致。
+     * </p>
+     */
+    private synchronized void cleanupOrphanedEntries() {
+        List<String> orphanedKeys = new ArrayList<>();
+        for (String key : registry.stringPropertyNames()) {
+            if (key.endsWith(".name")) {
+                String uuid = key.substring(0, key.length() - 5);
+                File cachedFile = new File(AppConfig.getIndexesDir(), uuid + ".sqlite");
+                if (!cachedFile.exists()) {
+                    orphanedKeys.add(uuid);
+                }
+            }
+        }
+        if (!orphanedKeys.isEmpty()) {
+            for (String uuid : orphanedKeys) {
+                registry.remove(uuid + ".name");
+                registry.remove(uuid + ".lastSync");
+                log.info("清理孤儿注册表条目: uuid={}", uuid);
+            }
+            saveRegistry();
+        }
+    }
 
     /**
      * 清理本地缓存中指定磁盘的数据
      *
      * @param uuid 磁盘 UUID
      */
-    public void removeCache(String uuid) {
+    public synchronized void removeCache(String uuid) {
         File cachedFile = new File(AppConfig.getIndexesDir(), uuid + ".sqlite");
         if (cachedFile.exists()) {
             cachedFile.delete();

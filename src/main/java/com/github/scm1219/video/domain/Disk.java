@@ -65,7 +65,7 @@ public class Disk {
      *
      * @return 当前 UUID
      */
-    public String ensureUuid() {
+    public synchronized String ensureUuid() {
         if (uuid == null || uuid.isEmpty()) {
             uuid = UUID.randomUUID().toString();
             try (Connection conn = index.getRepository().getConnection()) {

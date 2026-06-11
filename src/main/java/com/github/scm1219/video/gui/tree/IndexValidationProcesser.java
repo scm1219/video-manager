@@ -46,6 +46,13 @@ public class IndexValidationProcesser extends AbstractProgressFrame {
                 IndexStatistics stats = disk.getIndex().validateAndCleanup(callback);
                 long elapsed = System.currentTimeMillis() - startTime;
 
+                // 验证清理成功后，同步到本地缓存
+                try {
+                    disk.syncToCache();
+                } catch (Exception syncEx) {
+                    log.warn("同步索引缓存失败", syncEx);
+                }
+
                 progressBar.setString("验证完成");
                 StringBuilder result = new StringBuilder();
                 result.append("验证完成！\n\n");

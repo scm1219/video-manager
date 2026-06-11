@@ -67,6 +67,13 @@ public class FileUpdateProcesser extends AbstractProgressFrame {
                             + "总耗时: " + elapsed + "ms");
                 }
 
+                // 索引创建/更新成功后，同步到本地缓存
+                try {
+                    disk.syncToCache();
+                } catch (Exception syncEx) {
+                    log.warn("同步索引缓存失败", syncEx);
+                }
+
                 if (targetDirectory == null) {
                     long elapsed = System.currentTimeMillis() - startTime;
                     progressBar.setString("索引创建完成，耗时：" + elapsed + "ms");

@@ -4,6 +4,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
@@ -70,18 +71,22 @@ public class DiskManager {
     }
 
     /**
-     * 同步所有已挂载磁盘的索引到本地缓存
+     * 异步同步所有已挂载磁盘的索引到本地缓存
      */
     private void syncMountedDisks() {
-        for (Disk disk : disks) {
-            if (disk.hasIndex()) {
-                try {
-                    disk.syncToCache();
-                } catch (Exception e) {
-                    log.warn("同步磁盘索引缓存失败: {}", disk.getPath(), e);
+        CompletableFuture.runAsync(() -> {
+            log.info("开始异步同步磁盘索引缓存...");
+            for (Disk disk : disks) {
+                if (disk.hasIndex()) {
+                    try {
+                        disk.syncToCache();
+                    } catch (Exception e) {
+                        log.warn("同步磁盘索引缓存失败: {}", disk.getPath(), e);
+                    }
                 }
             }
-        }
+            log.info("异步同步磁盘索引缓存完成");
+        });
     }
 
     public Disk findDisk(File file) {
