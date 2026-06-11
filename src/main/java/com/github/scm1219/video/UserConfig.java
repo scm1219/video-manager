@@ -148,13 +148,16 @@ public class UserConfig {
                 save();
                 log.info("已迁移主题配置: theme={}", themeValue);
             }
-
-            // 删除旧文件
-            if (oldFile.delete()) {
-                log.info("已删除旧版主题配置文件: {}", oldFile.getAbsolutePath());
-            }
         } catch (IOException e) {
             log.error("迁移旧版主题配置失败", e);
+            return;
+        }
+
+        // 流已关闭，此时删除文件（避免 Windows 文件锁导致删除失败）
+        if (oldFile.delete()) {
+            log.info("已删除旧版主题配置文件: {}", oldFile.getAbsolutePath());
+        } else {
+            log.warn("删除旧版主题配置文件失败: {}", oldFile.getAbsolutePath());
         }
     }
 }
