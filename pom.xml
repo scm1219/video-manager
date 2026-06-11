@@ -5,7 +5,7 @@
 
 	<groupId>com.github.scm1219</groupId>
 	<artifactId>video-manager</artifactId>
-	<version>1.1.0-RELEASE</version>
+	<version>1.2.0-RELEASE</version>
 	<packaging>jar</packaging>
 	<description>移动设备视频文件管理</description>
 	<organization>
@@ -138,6 +138,18 @@
 							<mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>
 						</transformer>
 					</transformers>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>3.6.3</version>
+				<configuration>
+					<mainClass>com.github.scm1219.video.VideoManagerApp</mainClass>
+					<arguments>
+						<argument>-Xms64m</argument>
+						<argument>-Xmx256m</argument>
+					</arguments>
 				</configuration>
 			</plugin>
 			<plugin>

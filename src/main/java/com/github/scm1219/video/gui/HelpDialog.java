@@ -112,6 +112,15 @@ public class HelpDialog {
         String textColor = ThemeManager.getTextColor();
         String secondaryTextColor = ThemeManager.getSecondaryTextColor();
 
+        // 系统信息
+        String javaVersion = System.getProperty("java.version");
+        String javaVendor = System.getProperty("java.vendor");
+        String osName = System.getProperty("os.name");
+        String osVersion = System.getProperty("os.version");
+        String osArch = System.getProperty("os.arch");
+        int processors = Runtime.getRuntime().availableProcessors();
+        long maxMemoryMB = Runtime.getRuntime().maxMemory() / (1024 * 1024);
+
         String aboutHtml = String.format("""
             <html>
             <div style='text-align: left; padding: 0px; font-family: Microsoft YaHei, Arial;'>
@@ -132,10 +141,26 @@ public class HelpDialog {
                https://github.com/scm1219/video-manager
             </a>
             </p>
+            <hr style='border: none; border-top: 1px solid %s; margin: 6px 0;'>
+            <h3 style='color: %s; margin: 3px 0;'>系统信息</h3>
+            <p style='font-size: 10px; margin: 2px 0; color: %s;'>
+            <b>JVM:</b> %s (%s)
+            </p>
+            <p style='font-size: 10px; margin: 2px 0; color: %s;'>
+            <b>操作系统:</b> %s %s (%s)
+            </p>
+            <p style='font-size: 10px; margin: 2px 0; color: %s;'>
+            <b>处理器:</b> %d 核 &nbsp;|&nbsp; <b>最大内存:</b> %d MB
+            </p>
 
             </div>
             </html>
-            """, primaryColor, secondaryTextColor, textColor, version, textColor, primaryColor);
+            """,
+            primaryColor, secondaryTextColor, textColor, version, textColor, primaryColor,
+            secondaryTextColor, primaryColor,
+            textColor, javaVersion, javaVendor,
+            textColor, osName, osVersion, osArch,
+            textColor, processors, maxMemoryMB);
 
         // 创建 JEditorPane 并设置 HTML 内容
         JEditorPane editorPane = new JEditorPane("text/html", aboutHtml);
