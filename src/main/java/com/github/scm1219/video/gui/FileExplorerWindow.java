@@ -2,6 +2,7 @@ package com.github.scm1219.video.gui;
 
 import java.awt.Color;
 import java.awt.Container;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Point;
 import java.awt.GridBagConstraints;
@@ -58,6 +59,7 @@ import javax.swing.tree.TreePath;
 import org.apache.commons.lang3.StringUtils;
 
 import com.github.scm1219.video.AppConfig;
+import com.github.scm1219.video.UserConfig;
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
 import com.github.scm1219.video.domain.DiskManager.SearchResultItem;
@@ -71,7 +73,8 @@ import com.github.scm1219.utils.FileUtils;
 import java.awt.Font;
 
 public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMenuCallback,
-		MenuBarBuilder.IndexValidationCallback, ContextMenuBuilder.NavigationCallback {
+		MenuBarBuilder.IndexValidationCallback, MenuBarBuilder.IndexMenuCallback,
+		ContextMenuBuilder.NavigationCallback {
 	private static final long serialVersionUID = 1L;
 	private JPanel topPanel;
 	private JPanel leftPanel;
@@ -143,6 +146,29 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 	@Override
 	public void validateAndCleanupIndex() {
 		MenuBarBuilder.showIndexValidationDialog(this, fileSystemView);
+	}
+
+	// ---- MenuBarBuilder.IndexMenuCallback 实现 ----
+
+	@Override
+	public boolean isOfflineIndexEnabled() {
+		return UserConfig.getInstance().getBoolean(UserConfig.KEY_OFFLINE_INDEX, false);
+	}
+
+	@Override
+	public void setOfflineIndexEnabled(boolean enabled) {
+		UserConfig.getInstance().setBoolean(UserConfig.KEY_OFFLINE_INDEX, enabled);
+	}
+
+	@Override
+	public void openConfigDirectory() {
+		try {
+			Desktop.getDesktop().open(AppConfig.getUserDir());
+		} catch (Exception e) {
+			JOptionPane.showMessageDialog(this,
+				"无法打开配置目录: " + e.getMessage(),
+				"错误", JOptionPane.ERROR_MESSAGE);
+		}
 	}
 
 	// ---- ContextMenuBuilder.NavigationCallback 实现 ----
@@ -228,7 +254,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 		mRenameToSimple = contextMenuItems.renameToSimpleItem;
 
 		// 使用 MenuBarBuilder 创建菜单栏
-		JMenuBar menuBar = MenuBarBuilder.buildMenuBar(this, this, this, fileSystemView);
+		JMenuBar menuBar = MenuBarBuilder.buildMenuBar(this, this, this, this, fileSystemView);
 		themeMenu = (JMenu) menuBar.getMenu(0); // 第一个菜单是主题菜单
 		this.setJMenuBar(menuBar);
 	}
@@ -260,8 +286,13 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 	private void performSearch() {
 		String keyword = searchField.getText();
 		if (StringUtils.isNotBlank(keyword)) {
-			List<SearchResultItem> results = DiskManager.getInstance().searchAllFilesWithDiskInfo(keyword);
-			updateSearchResultWithDiskInfo(results);
+			if (isOfflineIndexEnabled()) {
+				List<SearchResultItem> results = DiskManager.getInstance().searchAllFilesWithDiskInfo(keyword);
+				updateSearchResultWithDiskInfo(results);
+			} else {
+				List<File> files = DiskManager.getInstance().searchAllFiles(keyword);
+				updateSearchResult(files);
+			}
 		}
 	}
 
@@ -847,8 +878,13 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 			public void actionPerformed(ActionEvent e) {
 				String test = searchField.getText();
 				if (StringUtils.isNotBlank(test)) {
-					List<File> files = DiskManager.getInstance().searchAllDirs(test);
-					updateSearchResult(files);
+					if (isOfflineIndexEnabled()) {
+						List<SearchResultItem> results = DiskManager.getInstance().searchAllDirsWithDiskInfo(test);
+						updateSearchResultWithDiskInfo(results);
+					} else {
+						List<File> files = DiskManager.getInstance().searchAllDirs(test);
+						updateSearchResult(files);
+					}
 				}
 			}
 		});

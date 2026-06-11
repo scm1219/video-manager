@@ -22,6 +22,8 @@ public final class AppConfig {
 	public static final String USER_DIR = ".video-manager";
 	public static final String INDEXES_DIR = "indexes";
 	public static final String REGISTRY_FILE = "registry.properties";
+	public static final String CONFIG_FILE = "config.properties";
+	public static final String OLD_THEME_FILE = "theme.properties";
 
 	private AppConfig() {
 	}
@@ -53,5 +55,20 @@ public final class AppConfig {
 	 */
 	public static File getRegistryFile() {
 		return new File(getUserDir(), REGISTRY_FILE);
+	}
+
+	/**
+	 * 获取用户配置文件路径（~/.video-manager/config.properties）
+	 */
+	public static File getConfigFile() {
+		return new File(getUserDir(), CONFIG_FILE);
+	}
+
+	/**
+	 * 获取旧版主题配置文件路径（~/.video-manager/theme.properties）
+	 * <p>仅用于迁移检测，迁移完成后应删除</p>
+	 */
+	public static File getOldThemeFile() {
+		return new File(getUserDir(), OLD_THEME_FILE);
 	}
 }

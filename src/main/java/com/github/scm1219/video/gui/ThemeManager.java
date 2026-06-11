@@ -1,61 +1,39 @@
 package com.github.scm1219.video.gui;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.Properties;
-
 import javax.swing.UnsupportedLookAndFeelException;
 
 import com.formdev.flatlaf.FlatDarkLaf;
+import com.github.scm1219.video.UserConfig;
 import lombok.extern.slf4j.Slf4j;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 
 /**
  * 主题管理器 - 管理 FlatLaf 主题的加载、切换和配置持久化
- *
- * 使用方法： 1. 应用启动时调用 applyTheme() 加载上次保存的主题 2. 用户切换主题时调用 applyTheme(themeName)
- * 并保存配置
+ * <p>
+ * 主题配置通过 {@link UserConfig} 统一存储在 config.properties 中。
+ * </p>
  *
  * @author FlatLaf Integration
- * @version 1.0.0
+ * @version 2.0.0
  */
 @Slf4j
 public class ThemeManager {
 
 	private static ThemeManager instance;
-	private Properties config;
-	private File configFile;
 
 	// 主题常量
 	public static final String THEME_LIGHT = "light";
 	public static final String THEME_DARK = "dark";
 	public static final String THEME_AUTO = "auto";
 
-	// 配置文件路径
-	private static final String CONFIG_DIR = ".video-manager";
-	private static final String CONFIG_FILE = "theme.properties";
-	private static final String THEME_KEY = "theme";
+	// 配置键
+	private static final String THEME_KEY = UserConfig.KEY_THEME;
 
 	/**
 	 * 私有构造函数，实现单例模式
 	 */
 	private ThemeManager() {
-		String userHome = System.getProperty("user.home");
-		File configDir = new File(userHome, CONFIG_DIR);
-
-		// 确保配置目录存在
-		if (!configDir.exists()) {
-			configDir.mkdirs();
-		}
-
-		this.configFile = new File(configDir, CONFIG_FILE);
-		this.config = new Properties();
-
-		// 加载配置文件
-		loadThemeConfig();
 	}
 
 	/**
@@ -71,35 +49,14 @@ public class ThemeManager {
 	}
 
 	/**
-	 * 从配置文件加载主题配置 如果配置文件不存在或读取失败，使用默认主题（light）
-	 */
-	private void loadThemeConfig() {
-		if (configFile.exists()) {
-			try (FileInputStream fis = new FileInputStream(configFile)) {
-				config.load(fis);
-			} catch (IOException e) {
-				// 配置文件读取失败，使用默认值
-				log.error("读取主题配置失败", e);
-			}
-		}
-	}
-
-	/**
-	 * 保存主题配置到文件
+	 * 保存主题配置
 	 *
 	 * @param themeName 主题名称（light/dark/auto）
 	 * @return 保存是否成功
 	 */
 	public boolean saveThemeConfig(String themeName) {
-		config.setProperty(THEME_KEY, themeName);
-
-		try (FileOutputStream fos = new FileOutputStream(configFile)) {
-			config.store(fos, "Theme Configuration\nAvailable values: light, dark, auto");
-			return true;
-		} catch (IOException e) {
-			log.error("保存主题配置失败", e);
-			return false;
-		}
+		UserConfig.getInstance().setString(THEME_KEY, themeName);
+		return true;
 	}
 
 	/**
@@ -108,7 +65,7 @@ public class ThemeManager {
 	 * @return 主题名称
 	 */
 	public String getCurrentTheme() {
-		return config.getProperty(THEME_KEY, THEME_LIGHT);
+		return UserConfig.getInstance().getString(THEME_KEY, THEME_LIGHT);
 	}
 
 	/**

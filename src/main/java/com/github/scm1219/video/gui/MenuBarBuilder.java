@@ -9,6 +9,7 @@ import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButtonMenuItem;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.filechooser.FileSystemView;
 
 import com.github.scm1219.video.domain.Disk;
@@ -44,11 +45,24 @@ public class MenuBarBuilder {
 	}
 
 	/**
+	 * 索引菜单扩展回调接口（离线索引、配置目录等）
+	 */
+	public interface IndexMenuCallback {
+		/** 获取离线索引是否启用 */
+		boolean isOfflineIndexEnabled();
+		/** 设置离线索引启用状态 */
+		void setOfflineIndexEnabled(boolean enabled);
+		/** 打开配置目录 */
+		void openConfigDirectory();
+	}
+
+	/**
 	 * 构建完整的菜单栏
 	 *
 	 * @param parentFrame 父窗口（用于对话框定位）
 	 * @param themeCallback 主题切换回调
 	 * @param indexCallback 索引验证回调
+	 * @param indexMenuCallback 索引菜单扩展回调
 	 * @param fileSystemView 文件系统视图（用于获取磁盘显示名称）
 	 * @return 构建好的 JMenuBar
 	 */
@@ -56,6 +70,7 @@ public class MenuBarBuilder {
 			JFrame parentFrame,
 			ThemeMenuCallback themeCallback,
 			IndexValidationCallback indexCallback,
+			IndexMenuCallback indexMenuCallback,
 			FileSystemView fileSystemView) {
 
 		JMenuBar menuBar = new JMenuBar();
@@ -64,7 +79,7 @@ public class MenuBarBuilder {
 		menuBar.add(buildThemeMenu(themeCallback));
 
 		// 创建索引菜单
-		menuBar.add(buildIndexMenu(parentFrame, indexCallback, fileSystemView));
+		menuBar.add(buildIndexMenu(parentFrame, indexCallback, indexMenuCallback, fileSystemView));
 
 		// 创建帮助菜单
 		menuBar.add(buildHelpMenu(parentFrame));
@@ -145,13 +160,30 @@ public class MenuBarBuilder {
 	 * 创建索引菜单
 	 */
 	private static JMenu buildIndexMenu(JFrame parentFrame, IndexValidationCallback callback,
-			FileSystemView fileSystemView) {
+			IndexMenuCallback indexMenuCallback, FileSystemView fileSystemView) {
 		JMenu indexMenu = new JMenu("索引");
 
 		// 验证并清理索引菜单项
 		JMenuItem validateAndCleanupItem = new JMenuItem("验证并清理索引");
 		validateAndCleanupItem.addActionListener(e -> callback.validateAndCleanupIndex());
 		indexMenu.add(validateAndCleanupItem);
+
+		// 离线索引复选框
+		JCheckBoxMenuItem offlineIndexItem = new JCheckBoxMenuItem("离线索引");
+		offlineIndexItem.setSelected(indexMenuCallback.isOfflineIndexEnabled());
+		offlineIndexItem.addActionListener(e -> {
+			boolean selected = offlineIndexItem.isSelected();
+			indexMenuCallback.setOfflineIndexEnabled(selected);
+		});
+		indexMenu.add(offlineIndexItem);
+
+		// 分隔线
+		indexMenu.addSeparator();
+
+		// 查看配置目录
+		JMenuItem openConfigDirItem = new JMenuItem("查看配置目录");
+		openConfigDirItem.addActionListener(e -> indexMenuCallback.openConfigDirectory());
+		indexMenu.add(openConfigDirItem);
 
 		return indexMenu;
 	}
