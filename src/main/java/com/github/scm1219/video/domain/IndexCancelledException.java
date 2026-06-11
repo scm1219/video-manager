@@ -10,21 +10,21 @@ package com.github.scm1219.video.domain;
  */
 public class IndexCancelledException extends RuntimeException {
 
-	private static final long serialVersionUID = 1L;
+    private static final long serialVersionUID = 1L;
 
-	/**
-	 * 构造一个索引取消异常
-	 */
-	public IndexCancelledException() {
-		super("索引创建被用户取消");
-	}
+    /**
+     * 构造一个索引取消异常
+     */
+    public IndexCancelledException() {
+        super("索引创建被用户取消");
+    }
 
-	/**
-	 * 构造一个带自定义消息的索引取消异常
-	 *
-	 * @param message 异常消息
-	 */
-	public IndexCancelledException(String message) {
-		super(message);
-	}
+    /**
+     * 构造一个带自定义消息的索引取消异常
+     *
+     * @param message 异常消息
+     */
+    public IndexCancelledException(String message) {
+        super(message);
+    }
 }

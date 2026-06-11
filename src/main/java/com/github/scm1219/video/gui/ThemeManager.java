@@ -20,172 +20,172 @@ import com.formdev.flatlaf.FlatLightLaf;
 @Slf4j
 public class ThemeManager {
 
-	private static ThemeManager instance;
+    private static ThemeManager instance;
 
-	// 主题常量
-	public static final String THEME_LIGHT = "light";
-	public static final String THEME_DARK = "dark";
-	public static final String THEME_AUTO = "auto";
+    // 主题常量
+    public static final String THEME_LIGHT = "light";
+    public static final String THEME_DARK = "dark";
+    public static final String THEME_AUTO = "auto";
 
-	// 配置键
-	private static final String THEME_KEY = UserConfig.KEY_THEME;
+    // 配置键
+    private static final String THEME_KEY = UserConfig.KEY_THEME;
 
-	/**
-	 * 私有构造函数，实现单例模式
-	 */
-	private ThemeManager() {
-	}
+    /**
+     * 私有构造函数，实现单例模式
+     */
+    private ThemeManager() {
+    }
 
-	/**
-	 * 获取 ThemeManager 单例实例
-	 *
-	 * @return ThemeManager 实例
-	 */
-	public static synchronized ThemeManager getInstance() {
-		if (instance == null) {
-			instance = new ThemeManager();
-		}
-		return instance;
-	}
+    /**
+     * 获取 ThemeManager 单例实例
+     *
+     * @return ThemeManager 实例
+     */
+    public static synchronized ThemeManager getInstance() {
+        if (instance == null) {
+            instance = new ThemeManager();
+        }
+        return instance;
+    }
 
-	/**
-	 * 保存主题配置
-	 *
-	 * @param themeName 主题名称（light/dark/auto）
-	 * @return 保存是否成功
-	 */
-	public boolean saveThemeConfig(String themeName) {
-		UserConfig.getInstance().setString(THEME_KEY, themeName);
-		return true;
-	}
+    /**
+     * 保存主题配置
+     *
+     * @param themeName 主题名称（light/dark/auto）
+     * @return 保存是否成功
+     */
+    public boolean saveThemeConfig(String themeName) {
+        UserConfig.getInstance().setString(THEME_KEY, themeName);
+        return true;
+    }
 
-	/**
-	 * 获取当前保存的主题名称 如果未配置，返回默认主题（light）
-	 *
-	 * @return 主题名称
-	 */
-	public String getCurrentTheme() {
-		return UserConfig.getInstance().getString(THEME_KEY, THEME_LIGHT);
-	}
+    /**
+     * 获取当前保存的主题名称 如果未配置，返回默认主题（light）
+     *
+     * @return 主题名称
+     */
+    public String getCurrentTheme() {
+        return UserConfig.getInstance().getString(THEME_KEY, THEME_LIGHT);
+    }
 
-	/**
-	 * 应用指定的 FlatLaf 主题
-	 *
-	 * @param themeName 主题名称（light/dark/auto）
-	 * @return 应用是否成功
-	 */
-	public boolean applyTheme(String themeName) {
-		try {
-			switch (themeName.toLowerCase()) {
-			case THEME_DARK:
-				FlatDarkLaf.setup();
-				break;
-			case THEME_AUTO:
-				// 使用 FlatLaf 的系统主题检测
-				boolean isDark = FlatLaf.isLafDark();
-				if (isDark) {
-					FlatDarkLaf.setup();
-				} else {
-					FlatLightLaf.setup();
-				}
-				break;
-			case THEME_LIGHT:
-			default:
-				FlatLightLaf.setup();
-				break;
-			}
+    /**
+     * 应用指定的 FlatLaf 主题
+     *
+     * @param themeName 主题名称（light/dark/auto）
+     * @return 应用是否成功
+     */
+    public boolean applyTheme(String themeName) {
+        try {
+            switch (themeName.toLowerCase()) {
+            case THEME_DARK:
+                FlatDarkLaf.setup();
+                break;
+            case THEME_AUTO:
+                // 使用 FlatLaf 的系统主题检测
+                boolean isDark = FlatLaf.isLafDark();
+                if (isDark) {
+                    FlatDarkLaf.setup();
+                } else {
+                    FlatLightLaf.setup();
+                }
+                break;
+            case THEME_LIGHT:
+            default:
+                FlatLightLaf.setup();
+                break;
+            }
 
-			// 保存主题配置
-			saveThemeConfig(themeName);
+            // 保存主题配置
+            saveThemeConfig(themeName);
 
-			return true;
-		} catch (Exception e) {
-			log.error("应用主题失败", e);
-			// 回退到系统默认 Look and Feel
-			try {
-				javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
-			} catch (ClassNotFoundException | InstantiationException | IllegalAccessException
-					| UnsupportedLookAndFeelException ex) {
-				log.error("回退到系统主题失败", ex);
-			}
-			return false;
-		}
-	}
+            return true;
+        } catch (Exception e) {
+            log.error("应用主题失败", e);
+            // 回退到系统默认 Look and Feel
+            try {
+                javax.swing.UIManager.setLookAndFeel(javax.swing.UIManager.getSystemLookAndFeelClassName());
+            } catch (ClassNotFoundException | InstantiationException | IllegalAccessException
+                    | UnsupportedLookAndFeelException ex) {
+                log.error("回退到系统主题失败", ex);
+            }
+            return false;
+        }
+    }
 
-	/**
-	 * 更新所有窗口的 UI 外观 用于在运行时切换主题后刷新界面
-	 */
-	public static void updateUI() {
-		FlatLaf.updateUI();
-	}
+    /**
+     * 更新所有窗口的 UI 外观 用于在运行时切换主题后刷新界面
+     */
+    public static void updateUI() {
+        FlatLaf.updateUI();
+    }
 
-	/**
-	 * 获取可用的主题列表
-	 *
-	 * @return 主题名称数组
-	 */
-	public static String[] getAvailableThemes() {
-		return new String[] { THEME_LIGHT, THEME_DARK, THEME_AUTO };
-	}
+    /**
+     * 获取可用的主题列表
+     *
+     * @return 主题名称数组
+     */
+    public static String[] getAvailableThemes() {
+        return new String[] { THEME_LIGHT, THEME_DARK, THEME_AUTO };
+    }
 
-	/**
-	 * 获取主题的显示名称
-	 *
-	 * @param themeName 主题名称
-	 * @return 显示名称
-	 */
-	public static String getThemeDisplayName(String themeName) {
-		switch (themeName.toLowerCase()) {
-		case THEME_DARK:
-			return "深色主题";
-		case THEME_AUTO:
-			return "跟随系统";
-		case THEME_LIGHT:
-		default:
-			return "浅色主题";
-		}
-	}
+    /**
+     * 获取主题的显示名称
+     *
+     * @param themeName 主题名称
+     * @return 显示名称
+     */
+    public static String getThemeDisplayName(String themeName) {
+        switch (themeName.toLowerCase()) {
+        case THEME_DARK:
+            return "深色主题";
+        case THEME_AUTO:
+            return "跟随系统";
+        case THEME_LIGHT:
+        default:
+            return "浅色主题";
+        }
+    }
 
-	/**
-	 * 获取当前主题的主色调颜色（用于标题）
-	 * 
-	 * @return 十六进制颜色代码
-	 */
-	public static String getPrimaryColor() {
-		// 检测当前是否为深色主题
-		boolean isDark = FlatLaf.isLafDark();
-		if (isDark) {
-			return "#64B5F6"; // 深色主题：浅蓝色
-		} else {
-			return "#1976D2"; // 浅色主题：深蓝色
-		}
-	}
+    /**
+     * 获取当前主题的主色调颜色（用于标题）
+     * 
+     * @return 十六进制颜色代码
+     */
+    public static String getPrimaryColor() {
+        // 检测当前是否为深色主题
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#64B5F6"; // 深色主题：浅蓝色
+        } else {
+            return "#1976D2"; // 浅色主题：深蓝色
+        }
+    }
 
-	/**
-	 * 获取当前主题的文本颜色（用于小标题）
-	 * 
-	 * @return 十六进制颜色代码
-	 */
-	public static String getTextColor() {
-		boolean isDark = FlatLaf.isLafDark();
-		if (isDark) {
-			return "#B0BEC5"; // 深色主题：浅灰色
-		} else {
-			return "#424242"; // 浅色主题：深灰色
-		}
-	}
+    /**
+     * 获取当前主题的文本颜色（用于小标题）
+     * 
+     * @return 十六进制颜色代码
+     */
+    public static String getTextColor() {
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#B0BEC5"; // 深色主题：浅灰色
+        } else {
+            return "#424242"; // 浅色主题：深灰色
+        }
+    }
 
-	/**
-	 * 获取当前主题的次要文本颜色（用于提示信息）
-	 * 
-	 * @return 十六进制颜色代码
-	 */
-	public static String getSecondaryTextColor() {
-		boolean isDark = FlatLaf.isLafDark();
-		if (isDark) {
-			return "#90A4AE"; // 深色主题：中灰色
-		} else {
-			return "#666666"; // 浅色主题：中灰色
-		}
-	}
+    /**
+     * 获取当前主题的次要文本颜色（用于提示信息）
+     * 
+     * @return 十六进制颜色代码
+     */
+    public static String getSecondaryTextColor() {
+        boolean isDark = FlatLaf.isLafDark();
+        if (isDark) {
+            return "#90A4AE"; // 深色主题：中灰色
+        } else {
+            return "#666666"; // 浅色主题：中灰色
+        }
+    }
 }
