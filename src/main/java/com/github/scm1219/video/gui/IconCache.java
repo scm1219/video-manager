@@ -18,10 +18,16 @@ public class IconCache {
         Icon icon = iconCache.get(key);
         if (icon == null) {
             icon = fileSystemView.getSystemIcon(file);
+            if (icon == null) {
+                // ConcurrentHashMap 不允许 null 值，使用默认目录图标作为回退
+                icon = fileSystemView.getSystemIcon(fileSystemView.getDefaultDirectory());
+            }
             if (iconCache.size() >= MAX_CACHE_SIZE) {
                 iconCache.clear();
             }
-            iconCache.put(key, icon);
+            if (icon != null) {
+                iconCache.put(key, icon);
+            }
         }
         return icon;
     }
@@ -31,6 +37,9 @@ public class IconCache {
         String name = displayNameCache.get(key);
         if (name == null) {
             name = fileSystemView.getSystemDisplayName(file);
+            if (name == null) {
+                name = file.getName();
+            }
             displayNameCache.put(key, name);
         }
         return name;
@@ -41,6 +50,9 @@ public class IconCache {
         String description = typeDescriptionCache.get(key);
         if (description == null) {
             description = fileSystemView.getSystemTypeDescription(file);
+            if (description == null) {
+                description = "";
+            }
             typeDescriptionCache.put(key, description);
         }
         return description;
