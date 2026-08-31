@@ -51,6 +51,9 @@ public class ContextMenuBuilder {
         mScanDirectory.addActionListener(e -> {
             FileTable fileTable = (FileTable) menu.getInvoker();
             int row = fileTable.getSelectedRow();
+            if (row < 0) {
+                return; // 无选中行，防御性兜底
+            }
             File file = (File) fileTable.getValueAt(row, 0);
 
             File targetDir;
@@ -62,7 +65,7 @@ public class ContextMenuBuilder {
 
             Disk disk = DiskManager.getInstance().findDisk(targetDir);
             if (disk == null) {
-                JOptionPane.showMessageDialog(null,
+                JOptionPane.showMessageDialog(parentFrame,
                         "该磁盘未启用索引功能\n请在磁盘根目录创建 " + Disk.FLAG_FILE + " 文件",
                         "提示",
                         MessageType.INFO.ordinal());
@@ -70,18 +73,16 @@ public class ContextMenuBuilder {
             }
 
             if (disk.getIndex().isIndexing()) {
-                JOptionPane.showMessageDialog(null,
+                JOptionPane.showMessageDialog(parentFrame,
                         "索引正在创建中，请稍后",
                         "提示",
                         MessageType.INFO.ordinal());
                 return;
             }
 
-            // 窗口构造与显示必须在 EDT 上执行，耗时扫描在窗口内部的工作线程进行
-            SwingUtilities.invokeLater(() -> {
-                FileUpdateProcesser pro = new FileUpdateProcesser(disk, targetDir);
-                pro.setVisible(true);
-            });
+            // 监听器本身在 EDT 上执行，耗时扫描在窗口内部的工作线程进行
+            FileUpdateProcesser pro = new FileUpdateProcesser(disk, targetDir);
+            pro.setVisible(true);
         });
 
         JMenuItem mNavigateTo = new JMenuItem("转到");
@@ -89,32 +90,38 @@ public class ContextMenuBuilder {
         mNavigateTo.addActionListener(e -> {
             FileTable fileTable = (FileTable) menu.getInvoker();
             int row = fileTable.getSelectedRow();
+            if (row < 0) {
+                return; // 无选中行，防御性兜底
+            }
             File file = (File) fileTable.getValueAt(row, 0);
 
-            if (callback.canNavigateToFile(file)) {
-                File parentDir = file.getParentFile();
-                Stack<File> navigationStack = callback.getNavigationStack();
-                navigationStack.clear();
+            // 目标文件/父目录的存在性检查涉及磁盘 I/O（离线盘可能很慢），放到后台线程执行
+            new Thread(() -> {
+                if (callback.canNavigateToFile(file)) {
+                    File parentDir = file.getParentFile();
+                    Stack<File> navigationStack = callback.getNavigationStack();
 
-                File current = parentDir;
-                Stack<File> tempStack = new Stack<>();
+                    File current = parentDir;
+                    Stack<File> tempStack = new Stack<>();
 
-                while (current != null && current.exists()) {
-                    tempStack.push(current);
-                    current = current.getParentFile();
+                    while (current != null && current.exists()) {
+                        tempStack.push(current);
+                        current = current.getParentFile();
+                    }
+
+                    SwingUtilities.invokeLater(() -> {
+                        navigationStack.clear();
+                        while (!tempStack.isEmpty()) {
+                            navigationStack.push(tempStack.pop());
+                        }
+                        callback.updateTable(parentDir, true);
+                    });
+                } else {
+                    String message = file == null || !file.exists() ? "文件不存在" : "父目录不存在或无法访问";
+                    SwingUtilities.invokeLater(() ->
+                        JOptionPane.showMessageDialog(parentFrame, message, "错误", JOptionPane.ERROR_MESSAGE));
                 }
-
-                while (!tempStack.isEmpty()) {
-                    navigationStack.push(tempStack.pop());
-                }
-
-                callback.updateTable(parentDir, true);
-            } else {
-                JOptionPane.showMessageDialog(parentFrame,
-                    file == null || !file.exists() ? "文件不存在" : "父目录不存在或无法访问",
-                    "错误",
-                    JOptionPane.ERROR_MESSAGE);
-            }
+            }).start();
         });
 
         JMenuItem mRenameToSimple = new JMenuItem("文件夹名转简体");
@@ -122,6 +129,9 @@ public class ContextMenuBuilder {
         mRenameToSimple.addActionListener(e -> {
             FileTable fileTable = (FileTable) menu.getInvoker();
             int row = fileTable.getSelectedRow();
+            if (row < 0) {
+                return; // 无选中行，防御性兜底
+            }
             File file = (File) fileTable.getValueAt(row, 0);
 
             if (!file.isDirectory()) return;
@@ -143,16 +153,22 @@ public class ContextMenuBuilder {
             if (confirm != JOptionPane.YES_OPTION) return;
 
             File newFile = new File(file.getParentFile(), newName);
-            if (file.renameTo(newFile)) {
-                IconCache.clear();
-                if (callback.getCurrentDir() != null) {
-                    callback.updateTable(callback.getCurrentDir(), true);
-                }
-            } else {
-                JOptionPane.showMessageDialog(parentFrame,
-                    "重命名失败，可能文件正在被使用或权限不足",
-                    "错误", JOptionPane.ERROR_MESSAGE);
-            }
+            // 目录重命名是磁盘 I/O（移动盘/大目录可能耗时数秒），放到后台线程执行
+            new Thread(() -> {
+                boolean success = file.renameTo(newFile);
+                SwingUtilities.invokeLater(() -> {
+                    if (success) {
+                        IconCache.clear();
+                        if (callback.getCurrentDir() != null) {
+                            callback.updateTable(callback.getCurrentDir(), true);
+                        }
+                    } else {
+                        JOptionPane.showMessageDialog(parentFrame,
+                            "重命名失败，可能文件正在被使用或权限不足",
+                            "错误", JOptionPane.ERROR_MESSAGE);
+                    }
+                });
+            }).start();
         });
 
         return new MenuItems(menu, mNavigateTo, mScanDirectory, mRenameToSimple);

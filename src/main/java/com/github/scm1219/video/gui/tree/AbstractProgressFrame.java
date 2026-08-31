@@ -4,6 +4,8 @@ import java.awt.Dimension;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 import javax.swing.Box;
 import javax.swing.JButton;
@@ -45,7 +47,8 @@ public abstract class AbstractProgressFrame extends JFrame {
         int left = (screen.width - WINDOW_WIDTH) / 2;
         int top = (screen.height - WINDOW_HEIGHT) / 2;
         setBounds(left, top, WINDOW_WIDTH, WINDOW_HEIGHT);
-        setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+        // 关闭行为由 windowClosing 统一处理：任务运行中需先确认取消
+        setDefaultCloseOperation(WindowConstants.DO_NOTHING_ON_CLOSE);
 
         progressBar.setIndeterminate(false);
         progressBar.setStringPainted(true);
@@ -56,20 +59,33 @@ public abstract class AbstractProgressFrame extends JFrame {
             public void actionPerformed(ActionEvent e) {
                 String text = button.getText();
                 if (text.equals(startButtonText)) {
+                    // 在 EDT 上同步切换按钮状态，防止快速双击"开始"重复启动任务
+                    setCancelButtonState();
                     onStart();
                 } else if (text.equals("关闭")) {
                     frame.dispose();
                 } else if (text.equals("取消")) {
-                    int confirm = javax.swing.JOptionPane.showConfirmDialog(frame,
-                            cancelConfirmMessage,
-                            "确认取消",
-                            javax.swing.JOptionPane.YES_NO_OPTION,
-                            javax.swing.JOptionPane.WARNING_MESSAGE);
-                    if (confirm == javax.swing.JOptionPane.YES_OPTION) {
+                    if (confirmCancel()) {
                         onCancelRequested();
                         button.setEnabled(false);
                         progressBar.setString(cancelProgressText);
                     }
+                }
+            }
+        });
+
+        addWindowListener(new WindowAdapter() {
+            @Override
+            public void windowClosing(WindowEvent e) {
+                // 按钮处于"取消"态说明任务正在运行，关窗前先确认取消，
+                // 避免窗口消失后工作线程无人监管地继续写数据库
+                if (button.getText().equals("取消")) {
+                    if (confirmCancel()) {
+                        onCancelRequested();
+                        frame.dispose();
+                    }
+                } else {
+                    frame.dispose();
                 }
             }
         });
@@ -83,6 +99,19 @@ public abstract class AbstractProgressFrame extends JFrame {
         }
         add(box);
         setVisible(true);
+    }
+
+    /**
+     * 弹出取消确认对话框
+     *
+     * @return true 表示用户确认取消
+     */
+    private boolean confirmCancel() {
+        return javax.swing.JOptionPane.showConfirmDialog(this,
+                cancelConfirmMessage,
+                "确认取消",
+                javax.swing.JOptionPane.YES_NO_OPTION,
+                javax.swing.JOptionPane.WARNING_MESSAGE) == javax.swing.JOptionPane.YES_OPTION;
     }
 
     /**

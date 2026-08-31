@@ -44,9 +44,11 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
             model = (FileTableModel) table.getModel();
         }
 
-        boolean isParentRow = (model != null && model.isParentRow(row));
-        boolean isOffline = (model != null && model.isOffline(row));
-        String diskName = (model != null) ? model.getDiskName(row) : null;
+        // 排序后视图行号与模型行号不一致，所有行级判断必须用模型行号
+        int modelRow = table.convertRowIndexToModel(row);
+        boolean isParentRow = (model != null && model.isParentRow(modelRow));
+        boolean isOffline = (model != null && model.isOffline(modelRow));
+        String diskName = (model != null) ? model.getDiskName(modelRow) : null;
             boolean isDark = FlatLaf.isLafDark();
 
         // 设置背景色和前景色
@@ -128,8 +130,8 @@ public class FileTableCellRenderer extends JLabel implements TableCellRenderer {
             long size = (long) value;
             if (size > 0) {
                 String fileSize = FileUtils.formatFileSize(size);
-                File file = (File) table.getValueAt(row, 0);
-                if (fileSystemView.isComputerNode(file) || fileSystemView.isDrive(file) || file.isDirectory()) {
+                boolean isDir = model != null && model.isDirectory(modelRow);
+                if (isDir) {
                     this.setText(null);
                 } else {
                     this.setText(fileSize);

@@ -49,11 +49,9 @@ public class FileUpdateProcesser extends AbstractProgressFrame {
 
     @Override
     protected void onStart() {
+        // 本方法在 EDT 上调用，按钮状态已由基类同步切换为"取消"
+        textArea.setText("");
         new Thread(() -> {
-            SwingUtilities.invokeLater(() -> {
-                textArea.setText("");
-                setCancelButtonState();
-            });
             long startTime = System.currentTimeMillis();
 
             ProgressCallback callback = ProgressBarCallback.of(progressBar);

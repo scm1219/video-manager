@@ -2,8 +2,10 @@ package com.github.scm1219.video.gui.table;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.swing.filechooser.FileSystemView;
@@ -18,7 +20,7 @@ public class FileTableModel extends AbstractTableModel {
     private static final File PARENT_ROW_NAME_FILE = new File(".. 返回上一级");
     private static final File PARENT_ROW_PATH_FILE = new File("");
 
-    private final FileSystemView fileSystemView = FileSystemView.getFileSystemView();
+    private static final FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private final List<File> files;
     private boolean showParentRow = false;
 
@@ -28,9 +30,62 @@ public class FileTableModel extends AbstractTableModel {
     /** 离线文件的行索引集合（实际行索引，已排除 parentRow 偏移） */
     private Set<Integer> offlineFileIndexes;
 
+    /**
+     * 行元数据缓存：目录加载/搜索时在后台线程预取填充，
+     * 渲染与排序路径只读缓存，避免每次重绘都做磁盘 I/O；未命中时懒加载一次
+     */
+    private final Map<String, FileMetaData> rowMetaCache = new HashMap<>();
+
     public FileTableModel(List<File> files, boolean showParentRow) {
         this.files = new ArrayList<>(files);
         this.showParentRow = showParentRow;
+    }
+
+    /**
+     * 文件行元数据（存在性、目录标记、修改时间、大小、类型描述）
+     */
+    public static class FileMetaData {
+        public final boolean exists;
+        public final boolean directory;
+        public final long lastModified;
+        public final long length;
+        public final String typeDescription;
+
+        private FileMetaData(boolean exists, boolean directory, long lastModified, long length,
+                String typeDescription) {
+            this.exists = exists;
+            this.directory = directory;
+            this.lastModified = lastModified;
+            this.length = length;
+            this.typeDescription = typeDescription;
+        }
+
+        /** 读取文件的各项元数据（含磁盘 I/O，仅供后台线程预取或懒加载兜底调用） */
+        public static FileMetaData load(File file) {
+            if (file == null) {
+                return new FileMetaData(false, false, 0L, 0L, "");
+            }
+            return new FileMetaData(file.exists(), file.isDirectory(), file.lastModified(), file.length(),
+                    fileSystemView.getSystemTypeDescription(file));
+        }
+    }
+
+    /**
+     * 在模型挂到表格前批量填充元数据缓存（数据由后台线程预取）
+     *
+     * @param cache 以文件绝对路径为键的元数据映射
+     */
+    public void setRowMetaCache(Map<String, FileMetaData> cache) {
+        if (cache != null) {
+            rowMetaCache.putAll(cache);
+        }
+    }
+
+    private FileMetaData metaFor(File file) {
+        if (file == null) {
+            return FileMetaData.load(null);
+        }
+        return rowMetaCache.computeIfAbsent(file.getAbsolutePath(), key -> FileMetaData.load(file));
     }
 
     @Override
@@ -118,6 +173,20 @@ public class FileTableModel extends AbstractTableModel {
         return offlineFileIndexes.contains(actualRow);
     }
 
+    /**
+     * 判断指定行是否为目录（读取预取的元数据，避免渲染时做磁盘 I/O）
+     */
+    public boolean isDirectory(int row) {
+        if (isParentRow(row)) {
+            return false;
+        }
+        int actualRow = showParentRow ? row - 1 : row;
+        if (actualRow < 0 || actualRow >= files.size()) {
+            return false;
+        }
+        return metaFor(files.get(actualRow)).directory;
+    }
+
     @Override
     public Object getValueAt(int row, int column) {
         if (isParentRow(row)) {
@@ -128,6 +197,7 @@ public class FileTableModel extends AbstractTableModel {
             return ""; // 行号越界（如点击空白区域）时兜底，避免抛出异常
         }
         File file = files.get(actualRow);
+        FileMetaData meta = metaFor(file);
         switch (column) {
         case 0:
             return file;
@@ -135,17 +205,17 @@ public class FileTableModel extends AbstractTableModel {
             if (isOffline(row)) {
                 return 0L;
             }
-            return file.lastModified();
+            return meta.lastModified;
         case 2:
             if (isOffline(row)) {
                 return "离线文件";
             }
-            return fileSystemView.getSystemTypeDescription(file);
+            return meta.typeDescription;
         case 3:
             if (isOffline(row)) {
                 return 0L;
             }
-            return file.length();
+            return meta.length;
         case 4:
             return file;
         default:
@@ -171,7 +241,7 @@ public class FileTableModel extends AbstractTableModel {
     }
 
     /**
-     * 检测指定行的文件是否存在
+     * 检测指定行的文件是否存在（读取预取的元数据）
      */
     public boolean fileExists(int row) {
         if (isParentRow(row))
@@ -182,7 +252,6 @@ public class FileTableModel extends AbstractTableModel {
         // 离线文件不存在于本地
         if (isOffline(row))
             return false;
-        File file = files.get(actualRow);
-        return file != null && file.exists();
+        return metaFor(files.get(actualRow)).exists;
     }
 }

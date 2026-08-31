@@ -35,7 +35,9 @@ public class TreeContextMenu {
         Disk disk = DiskManager.getInstance().findDisk(file);
         boolean isIndexed = disk != null;
 
-        mEchoIndexInfo.setEnabled(isIndexed && disk.getIndex().exists());
+        // 注意：此处不能用 disk.getIndex().exists() 之类磁盘 I/O 做菜单态，
+        // 掉线的移动硬盘会卡住右键菜单；索引文件是否存在的检查放到点击后的后台线程里做
+        mEchoIndexInfo.setEnabled(isIndexed);
         mCreateIndex.setEnabled(isIndexed);
         mCreateNeedIndexFile.setEnabled(!isIndexed);
         mShowSmart.setEnabled(true);
@@ -61,12 +63,22 @@ public class TreeContextMenu {
                 FileTreeNode fileTreeNode = (FileTreeNode) fileTree.mouseInPath.getLastPathComponent();
                 File file = fileTreeNode.getFile();
                 Disk disk = DiskManager.getInstance().findDisk(file);
-                if (disk == null || !disk.getIndex().exists()) {
+                if (disk == null) {
                     JOptionPane.showMessageDialog(fileTree, "未发现索引文件");
-                } else {
-                    String data = disk.getIndex().getInfoString();
-                    JOptionPane.showMessageDialog(fileTree, "索引信息\n" + data);
+                    return;
                 }
+                // 索引文件存在性检查与 SQLite 查询涉及磁盘 I/O，放到后台线程执行
+                new Thread(() -> {
+                    boolean exists = disk.getIndex().exists();
+                    String data = exists ? disk.getIndex().getInfoString() : null;
+                    SwingUtilities.invokeLater(() -> {
+                        if (data == null) {
+                            JOptionPane.showMessageDialog(fileTree, "未发现索引文件");
+                        } else {
+                            JOptionPane.showMessageDialog(fileTree, "索引信息\n" + data);
+                        }
+                    });
+                }).start();
             }
         });
 
@@ -98,11 +110,9 @@ public class TreeContextMenu {
                     return;
                 }
                 if (!disk.getIndex().isIndexing()) {
-                    // 窗口构造与显示必须在 EDT 上执行，耗时索引在窗口内部的工作线程进行
-                    SwingUtilities.invokeLater(() -> {
-                        FileUpdateProcesser pro = new FileUpdateProcesser(disk);
-                        pro.setVisible(true);
-                    });
+                    // 监听器本身在 EDT 上执行，耗时索引在窗口内部的工作线程进行
+                    FileUpdateProcesser pro = new FileUpdateProcesser(disk);
+                    pro.setVisible(true);
                 } else {
                     JOptionPane.showMessageDialog(fileTree, "索引正在创建中，不能重复创建");
                 }
@@ -113,24 +123,31 @@ public class TreeContextMenu {
             if (fileTree.mouseInPath != null) {
                 FileTreeNode fileTreeNode = (FileTreeNode) fileTree.mouseInPath.getLastPathComponent();
                 File file = fileTreeNode.getFile();
-                try {
-                    File flagFile = new File(file.getPath() + Disk.FLAG_FILE);
-                    if (flagFile.exists()) {
-                        JOptionPane.showMessageDialog(fileTree, "needindex文件已存在");
-                    } else {
+                // 创建标记文件、重扫磁盘、初始化数据库均为磁盘 I/O，放到后台线程执行
+                new Thread(() -> {
+                    try {
+                        File flagFile = new File(file.getPath() + Disk.FLAG_FILE);
+                        if (flagFile.exists()) {
+                            SwingUtilities.invokeLater(() ->
+                                JOptionPane.showMessageDialog(fileTree, "needindex文件已存在"));
+                            return;
+                        }
                         flagFile.createNewFile();
-                        JOptionPane.showMessageDialog(fileTree, "needindex文件创建成功");
                         DiskManager.getInstance().loadDisks();
                         Disk disk = DiskManager.getInstance().findDisk(file);
                         if (disk != null) {
                             disk.initEmptyDatabase();
                         }
-                        fileTreeNode.setIndexed(true);
-                        fileTree.repaint();
+                        SwingUtilities.invokeLater(() -> {
+                            JOptionPane.showMessageDialog(fileTree, "needindex文件创建成功");
+                            fileTreeNode.setIndexed(true);
+                            fileTree.repaint();
+                        });
+                    } catch (IOException ex) {
+                        SwingUtilities.invokeLater(() ->
+                            JOptionPane.showMessageDialog(fileTree, "创建needindex文件失败: " + ex.getMessage()));
                     }
-                } catch (IOException ex) {
-                    JOptionPane.showMessageDialog(fileTree, "创建needindex文件失败: " + ex.getMessage());
-                }
+                }).start();
             }
         });
     }

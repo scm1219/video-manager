@@ -13,15 +13,18 @@ import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;import java.awt.event.MouseEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicLong;
@@ -193,7 +196,10 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     }
 
     /**
-     * 扫描磁盘并构建目录树根节点（含磁盘 I/O，禁止在 EDT 上调用）
+     * 构建目录树根节点。
+     * 数据来源：showAllDisks 时 {@code File.listRoots()}（系统调用，较快），
+     * 否则读 DiskManager 的内存列表（磁盘重扫等 I/O 已由 refreshTree 的后台线程先行完成）。
+     * 启动路径与 refreshTree 完成回调均在 EDT 上调用本方法。
      */
     private FileTreeNode buildTreeRoot() {
         File[] rootDisks;
@@ -294,11 +300,13 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
     /**
      * 执行搜索（供搜索按钮、回车、实时搜索定时器调用）。
-     * 数据库查询与文件存在性检查在后台线程执行，避免阻塞 EDT。
+     * 数据库查询、文件存在性检查与行元数据预取在后台线程执行，避免阻塞 EDT。
      *
      * @param dirsOnly true 仅搜索文件夹，false 搜索文件
      */
     private void performSearch(boolean dirsOnly) {
+        // 手动搜索立即执行，取消待触发的实时搜索定时器，避免旧结果覆盖本次结果
+        searchTimer.stop();
         String keyword = searchField.getText();
         if (StringUtils.isBlank(keyword)) {
             return;
@@ -328,9 +336,9 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                 try {
                     SearchOutcome outcome = get();
                     if (outcome.results != null) {
-                        updateSearchResultWithDiskInfo(outcome.results);
+                        updateSearchResultWithDiskInfo(outcome.results, outcome.metaData);
                     } else {
-                        updateSearchResult(outcome.files, outcome.deletedCount);
+                        updateSearchResult(outcome.files, outcome.deletedCount, outcome.metaData);
                     }
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -345,39 +353,54 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
         final List<SearchResultItem> results;
         final List<File> files;
         final int deletedCount;
+        final Map<String, FileTableModel.FileMetaData> metaData;
 
-        private SearchOutcome(List<SearchResultItem> results, List<File> files, int deletedCount) {
+        private SearchOutcome(List<SearchResultItem> results, List<File> files, int deletedCount,
+                Map<String, FileTableModel.FileMetaData> metaData) {
             this.results = results;
             this.files = files;
             this.deletedCount = deletedCount;
+            this.metaData = metaData;
         }
 
         static SearchOutcome ofResults(List<SearchResultItem> results) {
-            return new SearchOutcome(results, null, 0);
+            // 仅在线文件需要元数据；离线文件渲染走 isOffline 分支，不访问磁盘
+            Map<String, FileTableModel.FileMetaData> metaData = new HashMap<>();
+            for (SearchResultItem item : results) {
+                if (item.online) {
+                    metaData.put(item.file.getAbsolutePath(), FileTableModel.FileMetaData.load(item.file));
+                }
+            }
+            return new SearchOutcome(results, null, 0, metaData);
         }
 
         static SearchOutcome ofFiles(List<File> files) {
+            Map<String, FileTableModel.FileMetaData> metaData = new HashMap<>();
             int deletedCount = 0;
             for (File file : files) {
-                if (!file.exists()) {
+                FileTableModel.FileMetaData meta = FileTableModel.FileMetaData.load(file);
+                metaData.put(file.getAbsolutePath(), meta);
+                if (!meta.exists) {
                     deletedCount++;
                 }
             }
-            return new SearchOutcome(null, files, deletedCount);
+            return new SearchOutcome(null, files, deletedCount, metaData);
         }
     }
 
     /**
      * 更新搜索结果
      *
-     * @param files        文件列表（已删除数量在后台线程统计完成）
+     * @param files        文件列表（已删除数量与元数据在后台线程统计完成）
      * @param deletedCount 已删除文件数量
+     * @param metaData     后台预取的行元数据
      */
-    private void updateSearchResult(List<File> files, int deletedCount) {
+    private void updateSearchResult(List<File> files, int deletedCount,
+            Map<String, FileTableModel.FileMetaData> metaData) {
         isSearchMode = true;
         File[] fileArray = new File[files.size()];
         files.toArray(fileArray);
-        setFileTable(fileArray);
+        setFileTable(fileArray, false, metaData);
         // 搜索后滚动条回到顶部
         spTable.getViewport().setViewPosition(new Point(0, 0));
         // 更新状态栏显示搜索结果数量和已删除数量
@@ -387,9 +410,11 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     /**
      * 更新搜索结果（携带磁盘名和离线标记）
      *
-     * @param results 搜索结果列表
+     * @param results   搜索结果列表
+     * @param metaData  后台预取的行元数据（仅在线文件）
      */
-    private void updateSearchResultWithDiskInfo(List<SearchResultItem> results) {
+    private void updateSearchResultWithDiskInfo(List<SearchResultItem> results,
+            Map<String, FileTableModel.FileMetaData> metaData) {
         isSearchMode = true;
 
         // 构建文件列表和元数据
@@ -413,7 +438,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
         File[] fileArray = new File[files.size()];
         files.toArray(fileArray);
-        setFileTableWithDiskInfo(fileArray, diskNames, offlineIndexes);
+        setFileTableWithDiskInfo(fileArray, diskNames, offlineIndexes, metaData);
 
         // 搜索后滚动条回到顶部
         spTable.getViewport().setViewPosition(new Point(0, 0));
@@ -424,20 +449,13 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
     /**
      * 设置表格里的数据
-     * 
-     * @param files 文件数组
-     */
-    private void setFileTable(File[] files) {
-        setFileTable(files, false);
-    }
-
-    /**
-     * 设置表格里的数据
-     * 
+     *
      * @param files         文件数组
      * @param showParentRow 是否显示"返回上一级"虚拟行
+     * @param metaData      后台预取的行元数据（可为 null，缺失时模型懒加载兜底）
      */
-    private void setFileTable(File[] files, boolean showParentRow) {
+    private void setFileTable(File[] files, boolean showParentRow,
+            Map<String, FileTableModel.FileMetaData> metaData) {
         List<File> fileList = new ArrayList<>();
         for (File file : files) {
             if (videoOnly) {
@@ -450,6 +468,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
         }
         Collections.sort(fileList, FILE_COMPARATOR);
         FileTableModel model = new FileTableModel(fileList, showParentRow);
+        model.setRowMetaCache(metaData);
 
         fileTable.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
@@ -473,8 +492,10 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
      * @param files          文件数组
      * @param diskNames      与 files 平行的磁盘名列表
      * @param offlineIndexes 离线文件的索引集合
+     * @param metaData       后台预取的行元数据（仅在线文件，可为 null）
      */
-    private void setFileTableWithDiskInfo(File[] files, List<String> diskNames, Set<Integer> offlineIndexes) {
+    private void setFileTableWithDiskInfo(File[] files, List<String> diskNames, Set<Integer> offlineIndexes,
+            Map<String, FileTableModel.FileMetaData> metaData) {
         List<File> fileList = new ArrayList<>();
         List<String> filteredDiskNames = new ArrayList<>();
         Set<Integer> adjustedOfflineIndexes = new HashSet<>();
@@ -501,6 +522,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
         FileTableModel model = new FileTableModel(fileList, false);
         model.setSearchMetadata(filteredDiskNames, adjustedOfflineIndexes);
+        model.setRowMetaCache(metaData);
 
         fileTable.setModel(model);
         TableRowSorter<FileTableModel> sort = new TableRowSorter<>(model);
@@ -626,10 +648,10 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                 if (showPrompt) {
                     List<Disk> disks = DiskManager.getInstance().listDisk();
                     if (disks.size() < 1) {
-                        JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "提示",
+                        JOptionPane.showMessageDialog(FileExplorerWindow.this, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "提示",
                                 MessageType.INFO.ordinal());
                     } else {
-                        JOptionPane.showMessageDialog(null, "刷新成功，共发现 " + disks.size() + " 个需要索引的磁盘", "提示",
+                        JOptionPane.showMessageDialog(FileExplorerWindow.this, "刷新成功，共发现 " + disks.size() + " 个需要索引的磁盘", "提示",
                                 MessageType.INFO.ordinal());
                     }
                 }
@@ -739,14 +761,20 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     }
 
     /**
-     * 后台加载目录内容并刷新表格；快速连续导航时仅应用最新一次请求的结果
+     * 后台加载目录内容并刷新表格；快速连续导航时仅应用最新一次请求的结果。
+     * 目录列表与行元数据（存在性/时间/大小/类型）均在后台线程预取，渲染时不再做磁盘 I/O
      */
     private void loadDirectoryAsync(File targetFile) {
         long seq = resultsSequence.incrementAndGet();
-        SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
+        SwingWorker<DirectorySnapshot, Void> worker = new SwingWorker<DirectorySnapshot, Void>() {
             @Override
-            protected File[] doInBackground() {
-                return fileSystemView.getFiles(targetFile, false);
+            protected DirectorySnapshot doInBackground() {
+                File[] files = fileSystemView.getFiles(targetFile, false);
+                Map<String, FileTableModel.FileMetaData> metaData = new HashMap<>(files.length * 2);
+                for (File file : files) {
+                    metaData.put(file.getAbsolutePath(), FileTableModel.FileMetaData.load(file));
+                }
+                return new DirectorySnapshot(files, metaData);
             }
 
             @Override
@@ -755,16 +783,20 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                     return; // 已有更新的导航请求，丢弃过期结果
                 }
                 try {
-                    File[] files = get();
+                    DirectorySnapshot snapshot = get();
                     // 判断是否在磁盘根目录
                     boolean isRootDirectory = isDiskRoot(targetFile);
-                    setFileTable(files, !isRootDirectory);
+                    setFileTable(snapshot.files, !isRootDirectory, snapshot.metaData);
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
             }
         };
         worker.execute();
+    }
+
+    /** 目录加载结果：文件列表 + 后台预取的行元数据 */
+    private record DirectorySnapshot(File[] files, Map<String, FileTableModel.FileMetaData> metaData) {
     }
 
     /**
@@ -821,10 +853,12 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                 if (row < 0) {
                     return; // 点击表格空白区域
                 }
+                // rowAtPoint 返回视图行号，排序后会与模型行号错位，行级判断必须先转换
+                int modelRow = sourceTable.convertRowIndexToModel(row);
 
                 // 检查是否点击虚拟行
                 FileTableModel model = sourceTable.getFileTableModel();
-                if (model != null && model.isParentRow(row)) {
+                if (model != null && model.isParentRow(modelRow)) {
                     // 双击虚拟行触发返回上级
                     if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
                         if (navigationStack.size() > 1) {
@@ -898,8 +932,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
         searchField.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                searchTimer.stop(); // 回车已立即搜索，取消待执行的实时搜索，避免重复执行
-                performSearch(false);
+                performSearch(false); // performSearch 内部会停掉待触发的实时搜索定时器
             }
         });
 
@@ -1121,7 +1154,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             }
         });
         if (DiskManager.getInstance().listDisk().size() < 1) {
-            JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "警告",
+            JOptionPane.showMessageDialog(this, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "警告",
                     MessageType.INFO.ordinal());
         }
     }
