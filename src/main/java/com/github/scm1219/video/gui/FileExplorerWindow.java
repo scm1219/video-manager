@@ -12,10 +12,8 @@ import java.awt.Toolkit;
 import java.awt.TrayIcon.MessageType;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
+import java.awt.event.MouseAdapter;import java.awt.event.MouseEvent;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.File;
@@ -26,6 +24,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.Stack;
+import java.util.concurrent.atomic.AtomicLong;
+
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.JButton;
@@ -110,6 +111,9 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     private boolean showAllDisks = false;
     private boolean isSearchMode = false;
 
+    /** 目录加载/搜索的请求序号：发起新请求时递增，后台任务完成后校验，丢弃过期结果 */
+    private final AtomicLong resultsSequence = new AtomicLong();
+
     // ---- MenuBarBuilder.ThemeMenuCallback 实现 ----
 
     @Override
@@ -185,6 +189,13 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
     private void initData() {
         navigationStack = new Stack<File>();
+        fileTreeRoot = buildTreeRoot();
+    }
+
+    /**
+     * 扫描磁盘并构建目录树根节点（含磁盘 I/O，禁止在 EDT 上调用）
+     */
+    private FileTreeNode buildTreeRoot() {
         File[] rootDisks;
 
         if (showAllDisks) {
@@ -198,18 +209,19 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
         }
 
         if (rootDisks.length > 0) {
-            fileTreeRoot = new FileTreeNode(rootDisks[0], true);
+            FileTreeNode root = new FileTreeNode(rootDisks[0], true);
 
-            File[] files = rootDisks;
-            for (int i = 0; i < files.length; i++) {
-                if (files[i].isDirectory()) {
-                    FileTreeNode childNode = new FileTreeNode(files[i], false);
-                    Disk disk = DiskManager.getInstance().findDisk(files[i]);
-                    childNode.setIndexed(disk != null && disk.needIndex());
-                    fileTreeRoot.add(childNode);
+            for (File disk : rootDisks) {
+                if (disk.isDirectory()) {
+                    FileTreeNode childNode = new FileTreeNode(disk, false);
+                    Disk indexedDisk = DiskManager.getInstance().findDisk(disk);
+                    childNode.setIndexed(indexedDisk != null && indexedDisk.needIndex());
+                    root.add(childNode);
                 }
             }
+            return root;
         }
+        return null;
     }
 
     private void createComponent() {
@@ -240,7 +252,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             @Override
             public void actionPerformed(ActionEvent e) {
                 if (realtimeSearchCheckBox.isSelected() && StringUtils.isNotBlank(searchField.getText())) {
-                    performSearch(); // 执行搜索
+                    performSearch(false); // 执行搜索
                 }
             }
         });
@@ -281,35 +293,88 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     public static final Comparator<Long> FILE_SIZE_COMPARATOR = Long::compare;
 
     /**
-     * 执行文件搜索（供按钮、键盘、实时搜索调用）
+     * 执行搜索（供搜索按钮、回车、实时搜索定时器调用）。
+     * 数据库查询与文件存在性检查在后台线程执行，避免阻塞 EDT。
+     *
+     * @param dirsOnly true 仅搜索文件夹，false 搜索文件
      */
-    private void performSearch() {
+    private void performSearch(boolean dirsOnly) {
         String keyword = searchField.getText();
-        if (StringUtils.isNotBlank(keyword)) {
-            if (isOfflineIndexEnabled()) {
-                List<SearchResultItem> results = DiskManager.getInstance().searchAllFilesWithDiskInfo(keyword);
-                updateSearchResultWithDiskInfo(results);
-            } else {
-                List<File> files = DiskManager.getInstance().searchAllFiles(keyword);
-                updateSearchResult(files);
+        if (StringUtils.isBlank(keyword)) {
+            return;
+        }
+        final boolean offlineMode = isOfflineIndexEnabled();
+        long seq = resultsSequence.incrementAndGet();
+        SwingWorker<SearchOutcome, Void> worker = new SwingWorker<SearchOutcome, Void>() {
+            @Override
+            protected SearchOutcome doInBackground() {
+                if (offlineMode) {
+                    List<SearchResultItem> results = dirsOnly
+                            ? DiskManager.getInstance().searchAllDirsWithDiskInfo(keyword)
+                            : DiskManager.getInstance().searchAllFilesWithDiskInfo(keyword);
+                    return SearchOutcome.ofResults(results);
+                }
+                List<File> files = dirsOnly
+                        ? DiskManager.getInstance().searchAllDirs(keyword)
+                        : DiskManager.getInstance().searchAllFiles(keyword);
+                return SearchOutcome.ofFiles(files);
             }
+
+            @Override
+            protected void done() {
+                if (resultsSequence.get() != seq) {
+                    return; // 已有更新的请求，丢弃过期结果
+                }
+                try {
+                    SearchOutcome outcome = get();
+                    if (outcome.results != null) {
+                        updateSearchResultWithDiskInfo(outcome.results);
+                    } else {
+                        updateSearchResult(outcome.files, outcome.deletedCount);
+                    }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    /** 后台搜索结果封装（离线/普通两种模式二选一） */
+    private static class SearchOutcome {
+        final List<SearchResultItem> results;
+        final List<File> files;
+        final int deletedCount;
+
+        private SearchOutcome(List<SearchResultItem> results, List<File> files, int deletedCount) {
+            this.results = results;
+            this.files = files;
+            this.deletedCount = deletedCount;
+        }
+
+        static SearchOutcome ofResults(List<SearchResultItem> results) {
+            return new SearchOutcome(results, null, 0);
+        }
+
+        static SearchOutcome ofFiles(List<File> files) {
+            int deletedCount = 0;
+            for (File file : files) {
+                if (!file.exists()) {
+                    deletedCount++;
+                }
+            }
+            return new SearchOutcome(null, files, deletedCount);
         }
     }
 
     /**
      * 更新搜索结果
      *
-     * @param files
+     * @param files        文件列表（已删除数量在后台线程统计完成）
+     * @param deletedCount 已删除文件数量
      */
-    private void updateSearchResult(List<File> files) {
+    private void updateSearchResult(List<File> files, int deletedCount) {
         isSearchMode = true;
-        // 统计已删除的文件数量
-        int deletedCount = 0;
-        for (File file : files) {
-            if (!file.exists()) {
-                deletedCount++;
-            }
-        }
         File[] fileArray = new File[files.size()];
         files.toArray(fileArray);
         setFileTable(fileArray);
@@ -523,19 +588,58 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
     }
 
     private void refreshTree(boolean showPrompt) {
-        // 保存当前选中的文件
+        // 保存当前选中的文件（供后台刷新完成后恢复选择）
         TreePath selectedPath = fileTree.getSelectionPath();
-        File selectedFile = null;
-        if (selectedPath != null) {
-            FileTreeNode node = (FileTreeNode) selectedPath.getLastPathComponent();
-            selectedFile = node.getFile();
-        }
+        final File selectedFile = selectedPath != null
+                ? ((FileTreeNode) selectedPath.getLastPathComponent()).getFile()
+                : null;
 
-        // 执行刷新逻辑
-        DiskManager.getInstance().reloadDisks();
-        initData();
+        // 磁盘重扫涉及 I/O，放到后台线程执行
+        SwingWorker<FileTreeNode, Void> worker = new SwingWorker<FileTreeNode, Void>() {
+            @Override
+            protected FileTreeNode doInBackground() {
+                DiskManager.getInstance().reloadDisks();
+                return buildTreeRoot();
+            }
 
-        DefaultTreeModel dfTreeModel = new DefaultTreeModel(fileTreeRoot) {
+            @Override
+            protected void done() {
+                try {
+                    fileTreeRoot = get();
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    return;
+                }
+                fileTree.setModel(createTreeModel(fileTreeRoot));
+                fileTree.setCellRenderer(new FileTreeCellRenderer());
+                fileTree.setRootVisible(false);
+
+                // 恢复选择或选择第一个
+                if (selectedFile != null) {
+                    restoreSelection(selectedFile);
+                } else if (fileTree.getRowCount() > 0) {
+                    fileTree.setSelectionRow(0);
+                }
+
+                updateIndexInfo();
+
+                if (showPrompt) {
+                    List<Disk> disks = DiskManager.getInstance().listDisk();
+                    if (disks.size() < 1) {
+                        JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "提示",
+                                MessageType.INFO.ordinal());
+                    } else {
+                        JOptionPane.showMessageDialog(null, "刷新成功，共发现 " + disks.size() + " 个需要索引的磁盘", "提示",
+                                MessageType.INFO.ordinal());
+                    }
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    private DefaultTreeModel createTreeModel(FileTreeNode root) {
+        return new DefaultTreeModel(root) {
             private static final long serialVersionUID = 1L;
 
             @Override
@@ -547,29 +651,6 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                 return ((File) treeNode.getUserObject()).isFile();
             }
         };
-        fileTree.setModel(dfTreeModel);
-        fileTree.setCellRenderer(new FileTreeCellRenderer());
-        fileTree.setRootVisible(false);
-
-        // 恢复选择或选择第一个
-        if (selectedFile != null) {
-            restoreSelection(selectedFile);
-        } else if (fileTree.getRowCount() > 0) {
-            fileTree.setSelectionRow(0);
-        }
-
-        updateIndexInfo();
-
-        if (showPrompt) {
-            List<Disk> disks = DiskManager.getInstance().listDisk();
-            if (disks.size() < 1) {
-                JOptionPane.showMessageDialog(null, "未发现需要索引的分区\n请在需要索引的分区根目录下\n添加  " + Disk.FLAG_FILE + " 文件", "提示",
-                        MessageType.INFO.ordinal());
-            } else {
-                JOptionPane.showMessageDialog(null, "刷新成功，共发现 " + disks.size() + " 个需要索引的磁盘", "提示",
-                        MessageType.INFO.ordinal());
-            }
-        }
     }
 
     /**
@@ -654,9 +735,14 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
         if (!isBack) {
             navigationStack.push(file);
         }
+        loadDirectoryAsync(file);
+    }
 
-        final File targetFile = file;
-
+    /**
+     * 后台加载目录内容并刷新表格；快速连续导航时仅应用最新一次请求的结果
+     */
+    private void loadDirectoryAsync(File targetFile) {
+        long seq = resultsSequence.incrementAndGet();
         SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
             @Override
             protected File[] doInBackground() {
@@ -665,6 +751,9 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
             @Override
             protected void done() {
+                if (resultsSequence.get() != seq) {
+                    return; // 已有更新的导航请求，丢弃过期结果
+                }
                 try {
                     File[] files = get();
                     // 判断是否在磁盘根目录
@@ -707,30 +796,11 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             navigationStack.push(tempStack.pop());
         }
 
-        final File targetFile = file;
-
-        SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
-            @Override
-            protected File[] doInBackground() {
-                return fileSystemView.getFiles(targetFile, false);
-            }
-
-            @Override
-            protected void done() {
-                try {
-                    File[] files = get();
-                    // 判断是否在磁盘根目录
-                    boolean isRootDirectory = isDiskRoot(targetFile);
-                    setFileTable(files, !isRootDirectory);
-                } catch (Exception ex) {
-                    ex.printStackTrace();
-                }
-            }
-        };
-        worker.execute();
+        loadDirectoryAsync(file);
     }
 
     private void addComponentListeners() {
+        // 树节点选中即加载目录（单击/键盘导航都走这里，无需再挂单击鼠标监听，避免重复触发）
         fileTree.addTreeSelectionListener(new TreeSelectionListener() {
             @Override
             public void valueChanged(TreeSelectionEvent e) {
@@ -743,31 +813,20 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             }
         });
 
-        fileTree.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 1) {
-                    javax.swing.JTree tree = (javax.swing.JTree) e.getSource();
-                    FileTreeNode selectNode = (FileTreeNode) tree.getLastSelectedPathComponent();
-                    if (selectNode != null) {
-                        File file = selectNode.getFile();
-                        updateTableWithPath(file);
-                    }
-                }
-            }
-        });
-
         fileTable.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                FileTable fileTable = (FileTable) e.getSource();
-                int row = fileTable.rowAtPoint(e.getPoint());
+                FileTable sourceTable = (FileTable) e.getSource();
+                int row = sourceTable.rowAtPoint(e.getPoint());
+                if (row < 0) {
+                    return; // 点击表格空白区域
+                }
 
                 // 检查是否点击虚拟行
-                FileTableModel model = fileTable.getFileTableModel();
+                FileTableModel model = sourceTable.getFileTableModel();
                 if (model != null && model.isParentRow(row)) {
                     // 双击虚拟行触发返回上级
-                    if (e.getClickCount() == 2 && e.getButton() == MouseEvent.BUTTON1) {
+                    if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
                         if (navigationStack.size() > 1) {
                             navigationStack.pop();
                             updateTable(navigationStack.peek(), true);
@@ -776,9 +835,8 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                     return;
                 }
 
-                File file = (File) fileTable.getValueAt(row, 0);
-                if (e.getClickCount() == 1) {
-                } else if (e.getClickCount() == 2) {
+                File file = (File) sourceTable.getValueAt(row, 0);
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
                     if (FileUtils.isVideoFile(file)) {
                         String filePath = file.getAbsolutePath();
                         if (ClickDebouncer.shouldOpen(filePath)) {
@@ -792,8 +850,8 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                         updateTable(file, false);
                     }
                 }
-                if (e.getButton() == MouseEvent.BUTTON3) {
-                    fileTable.setRowSelectionInterval(row, row);
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    sourceTable.setRowSelectionInterval(row, row);
 
                     // 动态控制"转到"菜单项状态
                     mNavigateTo.setEnabled(isSearchMode && canNavigateToFile(file));
@@ -804,7 +862,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
                     // 仅对文件夹显示"文件夹名转简体"菜单项
                     mRenameToSimple.setVisible(file.isDirectory());
 
-                    menu.show(fileTable, e.getX(), e.getY());
+                    menu.show(sourceTable, e.getX(), e.getY());
                 }
             }
         });
@@ -822,24 +880,26 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             @Override
             public void actionPerformed(ActionEvent e) {
                 searchField.setText("");
+                // 回到当前目录，不重复压入导航栈
                 if (currentDir != null) {
-                    updateTable(currentDir, false);
+                    updateTable(currentDir, true);
                 }
             }
         });
         btnSearch.addActionListener(new ActionListener() {
             @Override
             public void actionPerformed(ActionEvent e) {
-                performSearch();
+                performSearch(false);
             }
         });
 
-        searchField.addKeyListener(new KeyAdapter() {
+        // 回车触发搜索：用 ActionListener 而非 KeyListener，
+        // 避免中文输入法按回车确认候选词时误触发搜索
+        searchField.addActionListener(new ActionListener() {
             @Override
-            public void keyPressed(KeyEvent e) {
-                if (e.getKeyCode() == KeyEvent.VK_ENTER) {
-                    performSearch();
-                }
+            public void actionPerformed(ActionEvent e) {
+                searchTimer.stop(); // 回车已立即搜索，取消待执行的实时搜索，避免重复执行
+                performSearch(false);
             }
         });
 
@@ -876,16 +936,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
             @Override
             public void actionPerformed(ActionEvent e) {
-                String test = searchField.getText();
-                if (StringUtils.isNotBlank(test)) {
-                    if (isOfflineIndexEnabled()) {
-                        List<SearchResultItem> results = DiskManager.getInstance().searchAllDirsWithDiskInfo(test);
-                        updateSearchResultWithDiskInfo(results);
-                    } else {
-                        List<File> files = DiskManager.getInstance().searchAllDirs(test);
-                        updateSearchResult(files);
-                    }
-                }
+                performSearch(true);
             }
         });
 
@@ -926,20 +977,7 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
 
         spTable = new JScrollPane(fileTable);
         spTable.setBackground(Color.white);
-        // 设置table 列宽
-        DefaultTreeModel dfTreeModel = new DefaultTreeModel(fileTreeRoot) {
-            private static final long serialVersionUID = 1L;
-
-            @Override
-            public boolean isLeaf(Object node) {
-                FileTreeNode treeNode = (FileTreeNode) node;
-                if (treeNode.isDummyRoot()) {
-                    return false;
-                }
-                return ((File) treeNode.getUserObject()).isFile();
-            }
-        };
-        fileTree.setModel(dfTreeModel);
+        fileTree.setModel(createTreeModel(fileTreeRoot));
         fileTree.setCellRenderer(new FileTreeCellRenderer());
         fileTree.setRootVisible(false);
         fileTree.setSelectionRow(0);
@@ -1049,8 +1087,9 @@ public class FileExplorerWindow extends JFrame implements MenuBarBuilder.ThemeMe
             @Override
             public void actionPerformed(ActionEvent e) {
                 searchField.setText("");
+                // 回到当前目录，不重复压入导航栈
                 if (currentDir != null) {
-                    updateTable(currentDir, false);
+                    updateTable(currentDir, true);
                 }
                 searchField.requestFocusInWindow(); // 保持焦点在搜索框
             }

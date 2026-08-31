@@ -27,9 +27,20 @@ public class VideoManagerApp {
             return;
         }
 
+        // 磁盘扫描涉及 I/O，在主线程执行，不占用 EDT
         DiskManager m = DiskManager.getInstance();
         m.loadDisks();
 
+        // 所有 Swing 组件的创建与显示必须在 EDT 上执行
+        try {
+            SwingUtilities.invokeAndWait(VideoManagerApp::createAndShowMainWindow);
+        } catch (Exception e) {
+            log.error("启动主窗口失败", e);
+            System.exit(1);
+        }
+    }
+
+    private static void createAndShowMainWindow() {
         final JFrame frame = new FileExplorerWindow();
         Dimension screen = Toolkit.getDefaultToolkit().getScreenSize();
         int left = (screen.width - frame.getWidth()) / 2;
@@ -52,7 +63,6 @@ public class VideoManagerApp {
                 }
             }
         });
-
     }
 
     /**

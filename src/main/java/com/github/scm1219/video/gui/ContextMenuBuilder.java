@@ -7,6 +7,7 @@ import java.util.Stack;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
+import javax.swing.SwingUtilities;
 
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.DiskManager;
@@ -76,10 +77,11 @@ public class ContextMenuBuilder {
                 return;
             }
 
-            new Thread(() -> {
+            // 窗口构造与显示必须在 EDT 上执行，耗时扫描在窗口内部的工作线程进行
+            SwingUtilities.invokeLater(() -> {
                 FileUpdateProcesser pro = new FileUpdateProcesser(disk, targetDir);
                 pro.setVisible(true);
-            }).start();
+            });
         });
 
         JMenuItem mNavigateTo = new JMenuItem("转到");

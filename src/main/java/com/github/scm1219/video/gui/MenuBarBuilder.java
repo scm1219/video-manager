@@ -10,6 +10,7 @@ import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JRadioButtonMenuItem;
 import javax.swing.JCheckBoxMenuItem;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileSystemView;
 
 import com.github.scm1219.video.domain.Disk;
@@ -283,13 +284,13 @@ public class MenuBarBuilder {
             return;
         }
 
-        // 启动验证和清理进程
-        new Thread(new Runnable() {
+        // 启动验证和清理进程（窗口构造与显示在 EDT，验证在窗口内部的工作线程进行）
+        SwingUtilities.invokeLater(new Runnable() {
             @Override
             public void run() {
                 new IndexValidationProcesser(disk).setVisible(true);
             }
-        }).start();
+        });
     }
 
     /**

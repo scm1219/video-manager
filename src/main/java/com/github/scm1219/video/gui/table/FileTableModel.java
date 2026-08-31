@@ -14,6 +14,10 @@ public class FileTableModel extends AbstractTableModel {
     private static final long serialVersionUID = 1L;
     private static final String[] TABLE_HEADER = { "名称", "修改日期", "类型", "大小", "路径" };
 
+    /** 虚拟行展示用的固定对象，避免每次渲染重新创建 */
+    private static final File PARENT_ROW_NAME_FILE = new File(".. 返回上一级");
+    private static final File PARENT_ROW_PATH_FILE = new File("");
+
     private final FileSystemView fileSystemView = FileSystemView.getFileSystemView();
     private final List<File> files;
     private boolean showParentRow = false;
@@ -120,6 +124,9 @@ public class FileTableModel extends AbstractTableModel {
             return getParentRowValue(column);
         }
         int actualRow = showParentRow ? row - 1 : row;
+        if (actualRow < 0 || actualRow >= files.size()) {
+            return ""; // 行号越界（如点击空白区域）时兜底，避免抛出异常
+        }
         File file = files.get(actualRow);
         switch (column) {
         case 0:
@@ -149,15 +156,15 @@ public class FileTableModel extends AbstractTableModel {
     private Object getParentRowValue(int column) {
         switch (column) {
         case 0:
-            return new File(".. 返回上一级");
+            return PARENT_ROW_NAME_FILE;
         case 1:
-            return System.currentTimeMillis();
+            return 0L; // 修改日期无实际值，渲染为 "-"
         case 2:
             return "父目录";
         case 3:
             return 0L;
         case 4:
-            return new File("");
+            return PARENT_ROW_PATH_FILE;
         default:
             return "";
         }

@@ -1,5 +1,7 @@
 package com.github.scm1219.video.gui.tree;
 
+import javax.swing.SwingUtilities;
+
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.Index.IndexStatistics;
 import com.github.scm1219.video.domain.IndexCancelledException;
@@ -36,8 +38,10 @@ public class IndexValidationProcesser extends AbstractProgressFrame {
     @Override
     protected void onStart() {
         new Thread(() -> {
-            textArea.setText("");
-            setCancelButtonState();
+            SwingUtilities.invokeLater(() -> {
+                textArea.setText("");
+                setCancelButtonState();
+            });
             long startTime = System.currentTimeMillis();
 
             ProgressCallback callback = ProgressBarCallback.of(progressBar);
@@ -53,7 +57,6 @@ public class IndexValidationProcesser extends AbstractProgressFrame {
                     log.warn("同步索引缓存失败", syncEx);
                 }
 
-                progressBar.setString("验证完成");
                 StringBuilder result = new StringBuilder();
                 result.append("验证完成！\n\n");
                 result.append("索引记录总数: ").append(stats.getTotalCount()).append("\n");
@@ -66,17 +69,24 @@ public class IndexValidationProcesser extends AbstractProgressFrame {
                     result.append("\n索引完整，无需清理");
                 }
 
-                textArea.setText(result.toString());
-                setCloseButtonState();
+                SwingUtilities.invokeLater(() -> {
+                    progressBar.setString("验证完成");
+                    textArea.setText(result.toString());
+                    setCloseButtonState();
+                });
             } catch (IndexCancelledException e) {
-                progressBar.setString("验证已取消");
-                textArea.setText("验证已取消");
-                setCloseButtonState();
+                SwingUtilities.invokeLater(() -> {
+                    progressBar.setString("验证已取消");
+                    textArea.setText("验证已取消");
+                    setCloseButtonState();
+                });
             } catch (Exception e) {
-                progressBar.setString("验证失败");
-                textArea.setText("错误: " + e.getMessage());
-                setCloseButtonState();
                 log.error("索引验证失败", e);
+                SwingUtilities.invokeLater(() -> {
+                    progressBar.setString("验证失败");
+                    textArea.setText("错误: " + e.getMessage());
+                    setCloseButtonState();
+                });
             }
         }).start();
     }

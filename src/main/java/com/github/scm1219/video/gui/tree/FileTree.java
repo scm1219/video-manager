@@ -6,6 +6,7 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 
 import javax.swing.JTree;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.event.TreeExpansionEvent;
 import javax.swing.event.TreeWillExpandListener;
@@ -32,10 +33,15 @@ public class FileTree extends JTree {
         contextMenu = new TreeContextMenu(this);
 
         addMouseListener(new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
-                if (e.getButton() == MouseEvent.BUTTON3) {
-                    if (mouseInPath != null) {
-                        FileTreeNode fileTreeNode = (FileTreeNode) mouseInPath.getLastPathComponent();
+                if (SwingUtilities.isRightMouseButton(e)) {
+                    // 以点击坐标定位节点，避免依赖可能过期的 mouseInPath
+                    TreePath path = getPathForLocation(e.getX(), e.getY());
+                    if (path != null) {
+                        mouseInPath = path;
+                        setSelectionPath(path);
+                        FileTreeNode fileTreeNode = (FileTreeNode) path.getLastPathComponent();
                         contextMenu.updateMenuState(fileTreeNode);
                         contextMenu.getMenu().show(FileTree.this, e.getX(), e.getY());
                     }
@@ -48,6 +54,8 @@ public class FileTree extends JTree {
             public void treeWillExpand(TreeExpansionEvent event) throws ExpandVetoException {
                 FileTreeNode fileNode = (FileTreeNode) event.getPath().getLastPathComponent();
                 if (!fileNode.isInit()) {
+                    // 同步置位，防止快速折叠再展开时重复启动加载任务
+                    fileNode.setInit(true);
                     SwingWorker<File[], Void> worker = new SwingWorker<File[], Void>() {
                         @Override
                         protected File[] doInBackground() {
@@ -68,9 +76,9 @@ public class FileTree extends JTree {
                                         fileNode.add(childFileNode);
                                     }
                                 }
-                                fileNode.setInit(true);
                                 ((DefaultTreeModel) getModel()).nodeStructureChanged(fileNode);
                             } catch (Exception ex) {
+                                fileNode.setInit(false); // 加载失败回滚，允许下次重试
                                 log.error("加载文件节点失败", ex);
                             }
                         }

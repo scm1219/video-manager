@@ -2,6 +2,8 @@ package com.github.scm1219.video.gui.tree;
 
 import java.io.File;
 
+import javax.swing.SwingUtilities;
+
 import com.github.scm1219.video.domain.Disk;
 import com.github.scm1219.video.domain.Index.IndexStatistics;
 import com.github.scm1219.video.domain.IndexCancelledException;
@@ -48,8 +50,10 @@ public class FileUpdateProcesser extends AbstractProgressFrame {
     @Override
     protected void onStart() {
         new Thread(() -> {
-            textArea.setText("");
-            setCancelButtonState();
+            SwingUtilities.invokeLater(() -> {
+                textArea.setText("");
+                setCancelButtonState();
+            });
             long startTime = System.currentTimeMillis();
 
             ProgressCallback callback = ProgressBarCallback.of(progressBar);
@@ -60,11 +64,13 @@ public class FileUpdateProcesser extends AbstractProgressFrame {
                 } else {
                     IndexStatistics stats = disk.getIndex().createForDirectory(targetDirectory, callback);
                     long elapsed = System.currentTimeMillis() - startTime;
-                    progressBar.setString("扫描完成，耗时：" + elapsed + "ms");
-                    textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n"
-                            + "状态: 扫描完成\n"
-                            + stats.toFormattedString()
-                            + "总耗时: " + elapsed + "ms");
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setString("扫描完成，耗时：" + elapsed + "ms");
+                        textArea.setText("目录: " + targetDirectory.getAbsolutePath() + "\n"
+                                + "状态: 扫描完成\n"
+                                + stats.toFormattedString()
+                                + "总耗时: " + elapsed + "ms");
+                    });
                 }
 
                 // 索引创建/更新成功后，同步到本地缓存
@@ -76,20 +82,26 @@ public class FileUpdateProcesser extends AbstractProgressFrame {
 
                 if (targetDirectory == null) {
                     long elapsed = System.currentTimeMillis() - startTime;
-                    progressBar.setString("索引创建完成，耗时：" + elapsed + "ms");
-                    textArea.setText(disk.getIndex().getInfoString());
+                    SwingUtilities.invokeLater(() -> {
+                        progressBar.setString("索引创建完成，耗时：" + elapsed + "ms");
+                        textArea.setText(disk.getIndex().getInfoString());
+                    });
                 }
 
-                setCloseButtonState();
+                SwingUtilities.invokeLater(() -> setCloseButtonState());
             } catch (IndexCancelledException e) {
-                progressBar.setString("索引已取消，已恢复到原状态");
-                textArea.setText("索引已取消\n已恢复到索引前的状态");
-                setCloseButtonState();
+                SwingUtilities.invokeLater(() -> {
+                    progressBar.setString("索引已取消，已恢复到原状态");
+                    textArea.setText("索引已取消\n已恢复到索引前的状态");
+                    setCloseButtonState();
+                });
             } catch (Exception e) {
-                progressBar.setString("索引创建失败");
-                textArea.setText("错误: " + e.getMessage());
-                setCloseButtonState();
                 log.error("索引创建失败", e);
+                SwingUtilities.invokeLater(() -> {
+                    progressBar.setString("索引创建失败");
+                    textArea.setText("错误: " + e.getMessage());
+                    setCloseButtonState();
+                });
             }
         }).start();
     }
